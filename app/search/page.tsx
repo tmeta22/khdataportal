@@ -533,7 +533,7 @@ export default function SearchPage() {
       {showReferenceDialog && selectedReference && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg max-w-4xl w-full max-h-[80vh] overflow-y-auto">
-            <div className="p-6 bg-black">
+            <div className="p-6 bg-gray-950">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold">
                   {selectedReference.level === "province" ? "Province Details" : "Administrative Details"}
