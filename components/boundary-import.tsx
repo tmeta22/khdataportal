@@ -74,150 +74,6 @@ export function BoundaryImport({ onImportComplete }: BoundaryImportProps) {
     }
   }
 
-  const matchAdministrativeUnit = async (properties: any, type: string) => {
-    const possibleCodeFields = [
-      "code",
-      "CODE",
-      "ADM_CODE",
-      "PCODE",
-      "id",
-      "ID",
-      "pro_code",
-      "dis_code",
-      "com_code",
-      "PROVINCE_CODE",
-      "DISTRICT_CODE",
-      "COMMUNE_CODE",
-      "ADM1_PCODE",
-      "ADM2_PCODE",
-      "ADM3_PCODE",
-    ]
-    const possibleNameFields = [
-      "name",
-      "NAME",
-      "ADM_NAME",
-      "NAME_EN",
-      "name_en",
-      "NAME_KH",
-      "name_kh",
-      "PROVINCE",
-      "DISTRICT",
-      "COMMUNE",
-      "pro_name",
-      "dis_name",
-      "com_name",
-      "PROVINCE_NAME",
-      "DISTRICT_NAME",
-      "COMMUNE_NAME",
-      "ADM1_EN",
-      "ADM2_EN",
-      "ADM3_EN",
-    ]
-
-    let code = null
-    let name = null
-
-    if (type === "district") {
-      const districtCodeFields = ["ADM2_PCODE", "dis_code", "DISTRICT_CODE", "code", "CODE"]
-      for (const field of districtCodeFields) {
-        if (properties[field] !== undefined && properties[field] !== null && properties[field] !== "") {
-          code = properties[field].toString().trim()
-          console.log("[v0] Found district code field:", field, "=", code)
-          break
-        }
-      }
-
-      const districtNameFields = ["ADM2_EN", "DISTRICT", "DISTRICT_NAME", "dis_name", "name", "NAME"]
-      for (const field of districtNameFields) {
-        if (properties[field] !== undefined && properties[field] !== null && properties[field] !== "") {
-          name = properties[field].toString().trim()
-          console.log("[v0] Found district name field:", field, "=", name)
-          break
-        }
-      }
-    } else {
-      for (const field of possibleCodeFields) {
-        if (properties[field] !== undefined && properties[field] !== null && properties[field] !== "") {
-          code = properties[field].toString().trim()
-          console.log("[v0] Found code field:", field, "=", code)
-          break
-        }
-      }
-
-      for (const field of possibleNameFields) {
-        if (properties[field] !== undefined && properties[field] !== null && properties[field] !== "") {
-          name = properties[field].toString().trim()
-          console.log("[v0] Found name field:", field, "=", name)
-          break
-        }
-      }
-    }
-
-    if (!code && !name) {
-      console.log("[v0] No matching code or name found in properties:", Object.keys(properties))
-      return null
-    }
-
-    let tableName = ""
-    switch (type) {
-      case "province":
-        tableName = "provinces"
-        break
-      case "district":
-        tableName = "districts"
-        break
-      case "commune":
-        tableName = "communes"
-        break
-      default:
-        return null
-    }
-
-    let query = supabase.from(tableName).select("id, code, name_latin, name_khmer")
-
-    if (code) {
-      if (type === "district") {
-        const { data: directMatch } = await supabase
-          .from(tableName)
-          .select("id, code, name_latin, name_khmer")
-          .eq("code", code)
-          .limit(1)
-          .single()
-
-        if (directMatch) {
-          console.log(`[v0] Successfully matched ${type} by direct code:`, directMatch.name_latin)
-          return directMatch
-        }
-
-        if (properties.ADM1_PCODE) {
-          const { data: provinceData } = await supabase
-            .from("provinces")
-            .select("id")
-            .eq("code", properties.ADM1_PCODE)
-            .single()
-
-          if (provinceData) {
-            query = query.eq("province_id", provinceData.id)
-          }
-        }
-      }
-
-      query = query.eq("code", code)
-    } else if (name) {
-      query = query.or(`name_latin.ilike.%${name}%,name_khmer.ilike.%${name}%`)
-    }
-
-    const { data, error } = await query.limit(1).single()
-
-    if (error || !data) {
-      console.log(`[v0] No match found for ${type} with code: ${code}, name: ${name}`)
-      return null
-    }
-
-    console.log(`[v0] Successfully matched ${type}:`, data.name_latin)
-    return data
-  }
-
   const handleImport = async () => {
     if (!file || !boundaryType) {
       setError("Please select a file and boundary type")
@@ -247,42 +103,82 @@ export function BoundaryImport({ onImportComplete }: BoundaryImportProps) {
       let errors = 0
       const errorDetails: string[] = []
 
-      console.log("[v0] Processing", totalFeatures, "boundary features")
+      console.log("[v0] Processing", totalFeatures, "boundary features for map display")
 
       for (let i = 0; i < features.length; i++) {
         const feature = features[i]
         processed++
 
         try {
-          const matchedUnit = await matchAdministrativeUnit(feature.properties, boundaryType)
+          // Extract identifying information from properties
+          const properties = feature.properties || {}
 
-          if (!matchedUnit) {
+          // Try to extract code
+          const codeFields = ["ADM2_PCODE", "ADM1_PCODE", "ADM3_PCODE", "code", "CODE", "PCODE", "id", "ID"]
+          let code = null
+          for (const field of codeFields) {
+            if (properties[field] !== undefined && properties[field] !== null && properties[field] !== "") {
+              code = properties[field].toString().trim()
+              break
+            }
+          }
+
+          // Try to extract name
+          const nameFields = [
+            "ADM2_EN",
+            "ADM1_EN",
+            "ADM3_EN",
+            "name",
+            "NAME",
+            "NAME_EN",
+            "DISTRICT",
+            "PROVINCE",
+            "COMMUNE",
+          ]
+          let name = null
+          for (const field of nameFields) {
+            if (properties[field] !== undefined && properties[field] !== null && properties[field] !== "") {
+              name = properties[field].toString().trim()
+              break
+            }
+          }
+
+          // Create a unique identifier for this boundary
+          const boundaryId = code || name || `feature_${i + 1}`
+
+          if (!boundaryId) {
             errors++
-            errorDetails.push(
-              `Feature ${i + 1}: No matching ${boundaryType} found for properties: ${JSON.stringify(feature.properties)}`,
-            )
+            errorDetails.push(`Feature ${i + 1}: No identifying code or name found`)
             continue
           }
 
-          const boundaryTable = `${boundaryType}_boundaries`
-          const unitIdField = `${boundaryType}_id`
+          console.log(`[v0] Processing boundary: ${boundaryId} (${name || "unnamed"})`)
 
+          // Use a generic boundaries table for map display
+          const boundaryTable = "map_boundaries"
+
+          // Check if this boundary already exists
           const { data: existing } = await supabase
             .from(boundaryTable)
             .select("id")
-            .eq(unitIdField, matchedUnit.id)
+            .eq("boundary_id", boundaryId)
+            .eq("boundary_type", boundaryType)
             .single()
 
           if (existing) {
             skipped++
-            console.log(`[v0] Skipping existing boundary for ${boundaryType}:`, matchedUnit.name_latin)
+            console.log(`[v0] Skipping existing boundary: ${boundaryId}`)
             continue
           }
 
+          // Insert boundary for map display
           const { error: insertError } = await supabase.from(boundaryTable).insert({
-            [unitIdField]: matchedUnit.id,
+            boundary_id: boundaryId,
+            boundary_type: boundaryType,
+            name: name || boundaryId,
+            code: code,
             geojson: feature.geometry,
-            properties: feature.properties,
+            properties: properties,
           })
 
           if (insertError) {
@@ -291,7 +187,7 @@ export function BoundaryImport({ onImportComplete }: BoundaryImportProps) {
             console.error("[v0] Insert error:", insertError)
           } else {
             imported++
-            console.log(`[v0] Imported boundary for ${boundaryType}:`, matchedUnit.name_latin)
+            console.log(`[v0] Imported boundary for map display: ${boundaryId}`)
           }
         } catch (featureError) {
           errors++
@@ -331,8 +227,8 @@ export function BoundaryImport({ onImportComplete }: BoundaryImportProps) {
           Import Boundary Data
         </CardTitle>
         <CardDescription>
-          Import GeoJSON boundary files for provinces, districts, or communes. The system will automatically match
-          boundaries with existing administrative units.
+          Import GeoJSON boundary files for map visualization. Boundaries will be displayed on maps regardless of
+          existing administrative data.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -440,13 +336,9 @@ export function BoundaryImport({ onImportComplete }: BoundaryImportProps) {
           <ul className="text-sm space-y-1 text-muted-foreground">
             <li>• Valid GeoJSON format with features array</li>
             <li>• Each feature should have geometry and properties</li>
-            <li>• Properties should include administrative code or name</li>
-            <li>
-              • <strong>Supported code fields:</strong> code, CODE, ADM_CODE, PCODE, pro_code, dis_code, com_code
-            </li>
-            <li>
-              • <strong>Supported name fields:</strong> name, NAME, ADM_NAME, NAME_EN, PROVINCE, DISTRICT, COMMUNE
-            </li>
+            <li>• Properties should include identifying code or name for labeling</li>
+            <li>• Boundaries will be imported for map visualization only</li>
+            <li>• No matching with existing administrative data required</li>
           </ul>
         </div>
       </CardContent>
