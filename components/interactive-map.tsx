@@ -40,7 +40,9 @@ export function InteractiveMap({
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [showProvinceMarkers, setShowProvinceMarkers] = useState(true)
   const [showDistrictMarkers, setShowDistrictMarkers] = useState(false)
+  const [showKhanMarkers, setShowKhanMarkers] = useState(false)
   const [showCommuneMarkers, setShowCommuneMarkers] = useState(false)
+  const [showSangkatMarkers, setShowSangkatMarkers] = useState(false)
   const [showVillageMarkers, setShowVillageMarkers] = useState(false)
   const [selectedProvinceData, setSelectedProvinceData] = useState<any>(null)
   const [selectedDistrictData, setSelectedDistrictData] = useState<any>(null)
@@ -52,7 +54,9 @@ export function InteractiveMap({
   const [statistics, setStatistics] = useState({
     provinces: 0,
     districts: 0,
+    khan: 0,
     communes: 0,
+    sangkat: 0,
     villages: 0,
   })
   const [showProvinceBoundaries, setShowProvinceBoundaries] = useState(false)
@@ -65,24 +69,31 @@ export function InteractiveMap({
     try {
       console.log("[v0] Loading administrative statistics...")
 
-      const [provincesResult, districtsResult, communesResult, villagesResult] = await Promise.all([
-        supabase.from("provinces").select("id", { count: "exact", head: true }),
-        supabase.from("districts").select("id", { count: "exact", head: true }),
-        supabase.from("communes").select("id", { count: "exact", head: true }),
-        supabase.from("villages").select("id", { count: "exact", head: true }),
-      ])
+      const [provincesResult, districtsResult, khanResult, communesResult, sangkatResult, villagesResult] =
+        await Promise.all([
+          supabase.from("provinces").select("id", { count: "exact", head: true }),
+          supabase.from("districts").select("id", { count: "exact", head: true }),
+          supabase.from("khan").select("id", { count: "exact", head: true }),
+          supabase.from("communes").select("id", { count: "exact", head: true }),
+          supabase.from("sangkat").select("id", { count: "exact", head: true }),
+          supabase.from("villages").select("id", { count: "exact", head: true }),
+        ])
 
       setStatistics({
         provinces: provincesResult.count || 0,
         districts: districtsResult.count || 0,
+        khan: khanResult.count || 0,
         communes: communesResult.count || 0,
+        sangkat: sangkatResult.count || 0,
         villages: villagesResult.count || 0,
       })
 
       console.log("[v0] Statistics loaded:", {
         provinces: provincesResult.count,
         districts: districtsResult.count,
+        khan: khanResult.count,
         communes: communesResult.count,
+        sangkat: sangkatResult.count,
         villages: villagesResult.count,
       })
     } catch (error) {
@@ -100,8 +111,14 @@ export function InteractiveMap({
       case "districts":
         setShowDistrictMarkers(enabled)
         break
+      case "khan":
+        setShowKhanMarkers(enabled)
+        break
       case "communes":
         setShowCommuneMarkers(enabled)
+        break
+      case "sangkat":
+        setShowSangkatMarkers(enabled)
         break
       case "villages":
         setShowVillageMarkers(enabled)
@@ -123,7 +140,9 @@ export function InteractiveMap({
   const layerStates = {
     provinces: showProvinceMarkers,
     districts: showDistrictMarkers,
+    khan: showKhanMarkers,
     communes: showCommuneMarkers,
+    sangkat: showSangkatMarkers,
     villages: showVillageMarkers,
     provinceBoundaries: showProvinceBoundaries,
     districtBoundaries: showDistrictBoundaries,
@@ -192,7 +211,16 @@ export function InteractiveMap({
     }, 5000)
 
     return () => clearTimeout(timer)
-  }, [zoom, mapType, showProvinceMarkers, showDistrictMarkers, showCommuneMarkers, showVillageMarkers])
+  }, [
+    zoom,
+    mapType,
+    showProvinceMarkers,
+    showDistrictMarkers,
+    showKhanMarkers,
+    showCommuneMarkers,
+    showSangkatMarkers,
+    showVillageMarkers,
+  ])
 
   useEffect(() => {
     let count = 0
@@ -268,7 +296,9 @@ export function InteractiveMap({
             onFullscreenToggle={() => setIsFullscreen(!isFullscreen)}
             showProvinceMarkers={showProvinceMarkers}
             showDistrictMarkers={showDistrictMarkers}
+            showKhanMarkers={showKhanMarkers}
             showCommuneMarkers={showCommuneMarkers}
+            showSangkatMarkers={showSangkatMarkers}
             showVillageMarkers={showVillageMarkers}
             showProvinceBoundaries={showProvinceBoundaries}
             showDistrictBoundaries={showDistrictBoundaries}
@@ -341,7 +371,9 @@ export function InteractiveMap({
             {[
               showProvinceMarkers && "Provinces",
               showDistrictMarkers && "Districts",
+              showKhanMarkers && "Khan",
               showCommuneMarkers && "Communes",
+              showSangkatMarkers && "Sangkat",
               showVillageMarkers && "Villages",
             ]
               .filter(Boolean)
