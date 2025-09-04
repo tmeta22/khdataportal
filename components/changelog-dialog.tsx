@@ -17,6 +17,69 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
   {
+    version: "3.2.0",
+    date: "2025-01-09",
+    type: "feature",
+    title: "Census Data Integration",
+    description:
+      "Added comprehensive census data display on Details page with population demographics, household statistics, and data visualization on Explore page for all users.",
+    icon: <Database className="w-4 h-4" />,
+  },
+  {
+    version: "3.1.5",
+    date: "2025-01-09",
+    type: "bugfix",
+    title: "Leaflet MIME Type Fix",
+    description:
+      "Resolved Leaflet loading issues by implementing dynamic CDN imports, ensuring maps load properly across all browsers and environments.",
+    icon: <Bug className="w-4 h-4" />,
+  },
+  {
+    version: "3.1.4",
+    date: "2025-01-09",
+    type: "improvement",
+    title: "District Boundary Import",
+    description:
+      "Enhanced boundary import system to properly handle district-level GeoJSON data with improved matching logic for administrative codes.",
+    icon: <MapPin className="w-4 h-4" />,
+  },
+  {
+    version: "3.1.3",
+    date: "2025-01-09",
+    type: "improvement",
+    title: "Footer Redesign",
+    description:
+      "Updated footer layout with improved data source attribution and repositioned support section for better user experience.",
+    icon: <Palette className="w-4 h-4" />,
+  },
+  {
+    version: "3.1.2",
+    date: "2025-01-08",
+    type: "feature",
+    title: "Khan & Sangkat Support",
+    description:
+      "Added full support for Phnom Penh's urban administrative units (Khan and Sangkat) with proper legend integration and map display.",
+    icon: <Plus className="w-4 h-4" />,
+  },
+  {
+    version: "3.1.1",
+    date: "2025-01-08",
+    type: "bugfix",
+    title: "Map Controls Enhancement",
+    description:
+      "Moved map style controls outside overlay area and fixed boundary layer display with proper color coordination.",
+    icon: <Bug className="w-4 h-4" />,
+  },
+  {
+    version: "3.1.0",
+    date: "2025-01-08",
+    type: "feature",
+    title: "Advanced Map Legend",
+    description:
+      "Implemented comprehensive map legend with administrative levels, boundary controls, and real-time statistics display.",
+    icon: <Palette className="w-4 h-4" />,
+  },
+  {
     version: "2.1.0",
     date: "2024-12-19",
     type: "feature",

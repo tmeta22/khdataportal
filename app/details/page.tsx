@@ -63,11 +63,13 @@ interface Province {
 interface CensusData {
   id: string
   province_name: string
-  population: number
-  households: number
-  males: number
-  females: number
-  household_size: number
+  total?: number
+  males?: number
+  females?: number
+  households?: number
+  household_size?: number
+  area_km2?: number
+  pop_km2?: number
 }
 
 export default function DetailsPage() {
@@ -544,23 +546,20 @@ export default function DetailsPage() {
                             <h4 className="font-medium text-sm text-muted-foreground mb-3">Population Statistics</h4>
                             <div className="flex justify-between">
                               <span className="text-muted-foreground">Total Population</span>
-                              <span className="font-medium">{censusData.population.toLocaleString()}</span>
+                              <span className="font-medium">{censusData.total?.toLocaleString() || "N/A"}</span>
                             </div>
                             <div className="flex justify-between">
                               <span className="text-muted-foreground">Males</span>
-                              <span className="font-medium">{censusData.males.toLocaleString()}</span>
+                              <span className="font-medium">{censusData.males?.toLocaleString() || "N/A"}</span>
                             </div>
                             <div className="flex justify-between">
                               <span className="text-muted-foreground">Females</span>
-                              <span className="font-medium">{censusData.females.toLocaleString()}</span>
+                              <span className="font-medium">{censusData.females?.toLocaleString() || "N/A"}</span>
                             </div>
                             <div className="flex justify-between">
                               <span className="text-muted-foreground">Population Density</span>
                               <span className="font-medium">
-                                {selectedProvince.area > 0
-                                  ? Math.round(censusData.population / selectedProvince.area)
-                                  : 0}
-                                /km²
+                                {censusData.pop_km2 ? `${Math.round(censusData.pop_km2)}/km²` : "N/A"}
                               </span>
                             </div>
                           </div>
@@ -568,11 +567,19 @@ export default function DetailsPage() {
                             <h4 className="font-medium text-sm text-muted-foreground mb-3">Household Statistics</h4>
                             <div className="flex justify-between">
                               <span className="text-muted-foreground">Total Households</span>
-                              <span className="font-medium">{censusData.households.toLocaleString()}</span>
+                              <span className="font-medium">{censusData.households?.toLocaleString() || "N/A"}</span>
                             </div>
                             <div className="flex justify-between">
                               <span className="text-muted-foreground">Average Household Size</span>
-                              <span className="font-medium">{censusData.household_size.toFixed(1)} persons</span>
+                              <span className="font-medium">
+                                {censusData.household_size ? `${censusData.household_size} persons` : "N/A"}
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Area</span>
+                              <span className="font-medium">
+                                {censusData.area_km2 ? `${censusData.area_km2.toLocaleString()} km²` : "N/A"}
+                              </span>
                             </div>
                             <div className="flex justify-between">
                               <span className="text-muted-foreground">Sub-divisions</span>
@@ -582,7 +589,8 @@ export default function DetailsPage() {
                         </div>
                         <div className="pt-4 border-t">
                           <p className="text-xs text-muted-foreground">
-                            Data source: National Institute of Statistics, Ministry of Planning, Kingdom of Cambodia
+                            Data source: Provisional Census 2019, National Institute of Statistics, Ministry of
+                            Planning, Kingdom of Cambodia
                           </p>
                         </div>
                       </div>
@@ -614,6 +622,12 @@ export default function DetailsPage() {
                             <span className="text-muted-foreground">Sub-divisions</span>
                             <span className="font-medium">{selectedProvince.subdivisions}</span>
                           </div>
+                        </div>
+                        <div className="pt-4 border-t">
+                          <p className="text-xs text-muted-foreground">
+                            Census data not available for this province. Showing estimated values from administrative
+                            records.
+                          </p>
                         </div>
                       </div>
                     )}
