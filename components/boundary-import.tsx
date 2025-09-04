@@ -30,15 +30,15 @@ export function BoundaryImport({ onImportComplete }: BoundaryImportProps) {
     errorDetails: string[]
   } | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [preview, setPreview] = useState<any>(null)
 
   const supabase = createClientComponentClient()
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0]
     if (selectedFile) {
       console.log("[v0] Boundary file selected:", selectedFile.name, selectedFile.type)
 
-      // Validate file type
       const validTypes = ["application/json", "application/geo+json", "text/plain"]
       const isValidType = validTypes.includes(selectedFile.type) || selectedFile.name.endsWith(".geojson")
 
@@ -50,38 +50,91 @@ export function BoundaryImport({ onImportComplete }: BoundaryImportProps) {
       setFile(selectedFile)
       setError(null)
       setResults(null)
+
+      try {
+        const fileContent = await selectedFile.text()
+        const geoJsonData = JSON.parse(fileContent)
+
+        if (geoJsonData.features && geoJsonData.features.length > 0) {
+          const sampleFeature = geoJsonData.features[0]
+          setPreview({
+            totalFeatures: geoJsonData.features.length,
+            sampleProperties: sampleFeature.properties,
+            geometryType: sampleFeature.geometry?.type,
+          })
+          console.log("[v0] GeoJSON preview:", {
+            features: geoJsonData.features.length,
+            sampleProperties: sampleFeature.properties,
+          })
+        }
+      } catch (previewError) {
+        console.error("[v0] Preview error:", previewError)
+        setPreview(null)
+      }
     }
   }
 
   const matchAdministrativeUnit = async (properties: any, type: string) => {
-    // Try to match by various possible property names
-    const possibleCodeFields = ["code", "CODE", "ADM_CODE", "PCODE", "id", "ID"]
-    const possibleNameFields = ["name", "NAME", "ADM_NAME", "NAME_EN", "name_en", "NAME_KH", "name_kh"]
+    const possibleCodeFields = [
+      "code",
+      "CODE",
+      "ADM_CODE",
+      "PCODE",
+      "id",
+      "ID",
+      "pro_code",
+      "dis_code",
+      "com_code",
+      "PROVINCE_CODE",
+      "DISTRICT_CODE",
+      "COMMUNE_CODE",
+      "ADM1_PCODE",
+      "ADM2_PCODE",
+      "ADM3_PCODE",
+    ]
+    const possibleNameFields = [
+      "name",
+      "NAME",
+      "ADM_NAME",
+      "NAME_EN",
+      "name_en",
+      "NAME_KH",
+      "name_kh",
+      "PROVINCE",
+      "DISTRICT",
+      "COMMUNE",
+      "pro_name",
+      "dis_name",
+      "com_name",
+      "PROVINCE_NAME",
+      "DISTRICT_NAME",
+      "COMMUNE_NAME",
+    ]
 
     let code = null
     let name = null
 
-    // Find code
     for (const field of possibleCodeFields) {
-      if (properties[field]) {
-        code = properties[field].toString()
+      if (properties[field] !== undefined && properties[field] !== null && properties[field] !== "") {
+        code = properties[field].toString().trim()
+        console.log("[v0] Found code field:", field, "=", code)
         break
       }
     }
 
-    // Find name
     for (const field of possibleNameFields) {
-      if (properties[field]) {
-        name = properties[field].toString()
+      if (properties[field] !== undefined && properties[field] !== null && properties[field] !== "") {
+        name = properties[field].toString().trim()
+        console.log("[v0] Found name field:", field, "=", name)
         break
       }
     }
 
     if (!code && !name) {
+      console.log("[v0] No matching code or name found in properties:", Object.keys(properties))
       return null
     }
 
-    // Query the appropriate table
     let tableName = ""
     switch (type) {
       case "province":
@@ -112,6 +165,7 @@ export function BoundaryImport({ onImportComplete }: BoundaryImportProps) {
       return null
     }
 
+    console.log(`[v0] Successfully matched ${type}:`, data.name_latin)
     return data
   }
 
@@ -129,7 +183,6 @@ export function BoundaryImport({ onImportComplete }: BoundaryImportProps) {
     try {
       console.log("[v0] Starting boundary import for type:", boundaryType)
 
-      // Read and parse GeoJSON file
       const fileContent = await file.text()
       const geoJsonData = JSON.parse(fileContent)
 
@@ -147,13 +200,11 @@ export function BoundaryImport({ onImportComplete }: BoundaryImportProps) {
 
       console.log("[v0] Processing", totalFeatures, "boundary features")
 
-      // Process each feature
       for (let i = 0; i < features.length; i++) {
         const feature = features[i]
         processed++
 
         try {
-          // Match with existing administrative unit
           const matchedUnit = await matchAdministrativeUnit(feature.properties, boundaryType)
 
           if (!matchedUnit) {
@@ -164,7 +215,6 @@ export function BoundaryImport({ onImportComplete }: BoundaryImportProps) {
             continue
           }
 
-          // Check if boundary already exists
           const boundaryTable = `${boundaryType}_boundaries`
           const unitIdField = `${boundaryType}_id`
 
@@ -180,7 +230,6 @@ export function BoundaryImport({ onImportComplete }: BoundaryImportProps) {
             continue
           }
 
-          // Insert boundary data
           const { error: insertError } = await supabase.from(boundaryTable).insert({
             [unitIdField]: matchedUnit.id,
             geojson: feature.geometry,
@@ -201,7 +250,6 @@ export function BoundaryImport({ onImportComplete }: BoundaryImportProps) {
           console.error("[v0] Feature processing error:", featureError)
         }
 
-        // Update progress
         setProgress(Math.round((processed / totalFeatures) * 100))
       }
 
@@ -210,7 +258,7 @@ export function BoundaryImport({ onImportComplete }: BoundaryImportProps) {
         imported,
         skipped,
         errors,
-        errorDetails: errorDetails.slice(0, 10), // Show first 10 errors
+        errorDetails: errorDetails.slice(0, 10),
       })
 
       console.log("[v0] Boundary import completed:", { processed, imported, skipped, errors })
@@ -239,7 +287,6 @@ export function BoundaryImport({ onImportComplete }: BoundaryImportProps) {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Boundary Type Selection */}
         <div className="space-y-2">
           <Label htmlFor="boundary-type">Boundary Type</Label>
           <Select value={boundaryType} onValueChange={setBoundaryType}>
@@ -254,7 +301,6 @@ export function BoundaryImport({ onImportComplete }: BoundaryImportProps) {
           </Select>
         </div>
 
-        {/* File Selection */}
         <div className="space-y-2">
           <Label htmlFor="boundary-file">Select GeoJSON File</Label>
           <Input
@@ -271,13 +317,31 @@ export function BoundaryImport({ onImportComplete }: BoundaryImportProps) {
           )}
         </div>
 
-        {/* Import Button */}
+        {preview && (
+          <div className="p-4 bg-muted rounded-lg">
+            <h4 className="font-medium mb-2">GeoJSON Preview</h4>
+            <div className="space-y-2 text-sm">
+              <p>
+                <strong>Total Features:</strong> {preview.totalFeatures}
+              </p>
+              <p>
+                <strong>Geometry Type:</strong> {preview.geometryType}
+              </p>
+              <div>
+                <strong>Sample Properties:</strong>
+                <pre className="mt-1 p-2 bg-background rounded text-xs overflow-auto max-h-32">
+                  {JSON.stringify(preview.sampleProperties, null, 2)}
+                </pre>
+              </div>
+            </div>
+          </div>
+        )}
+
         <Button onClick={handleImport} disabled={!file || !boundaryType || isImporting} className="w-full">
           <Upload className="h-4 w-4 mr-2" />
           {isImporting ? "Importing..." : "Import Boundaries"}
         </Button>
 
-        {/* Progress */}
         {isImporting && (
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
@@ -288,7 +352,6 @@ export function BoundaryImport({ onImportComplete }: BoundaryImportProps) {
           </div>
         )}
 
-        {/* Error Display */}
         {error && (
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
@@ -296,7 +359,6 @@ export function BoundaryImport({ onImportComplete }: BoundaryImportProps) {
           </Alert>
         )}
 
-        {/* Results Display */}
         {results && (
           <Alert variant={results.errors > 0 ? "destructive" : "default"}>
             <CheckCircle className="h-4 w-4" />
@@ -324,14 +386,18 @@ export function BoundaryImport({ onImportComplete }: BoundaryImportProps) {
           </Alert>
         )}
 
-        {/* Format Requirements */}
         <div className="mt-6 p-4 bg-muted rounded-lg">
           <h4 className="font-medium mb-2">GeoJSON Format Requirements</h4>
           <ul className="text-sm space-y-1 text-muted-foreground">
             <li>• Valid GeoJSON format with features array</li>
             <li>• Each feature should have geometry and properties</li>
             <li>• Properties should include administrative code or name</li>
-            <li>• Supported property names: code, CODE, ADM_CODE, PCODE, name, NAME, ADM_NAME</li>
+            <li>
+              • <strong>Supported code fields:</strong> code, CODE, ADM_CODE, PCODE, pro_code, dis_code, com_code
+            </li>
+            <li>
+              • <strong>Supported name fields:</strong> name, NAME, ADM_NAME, NAME_EN, PROVINCE, DISTRICT, COMMUNE
+            </li>
           </ul>
         </div>
       </CardContent>

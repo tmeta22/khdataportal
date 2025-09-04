@@ -6,7 +6,19 @@ import dynamic from "next/dynamic"
 import { Header } from "@/components/header"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card } from "@/components/ui/card"
-import { Upload, Table, AlertCircle, Loader2, MapPin, Building, Home, TreePine, Map } from "lucide-react"
+import {
+  Upload,
+  Table,
+  AlertCircle,
+  Loader2,
+  MapPin,
+  Building,
+  Home,
+  TreePine,
+  Map,
+  BarChart3,
+  Users,
+} from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { createClient } from "@/lib/supabase/client"
 
@@ -77,6 +89,45 @@ const BoundaryDetailsTable = dynamic(
       <div className="flex items-center justify-center py-8">
         <Loader2 className="w-6 h-6 animate-spin mr-2" />
         <span>Loading boundary details...</span>
+      </div>
+    ),
+  },
+)
+
+const CensusImport = dynamic(
+  () => import("@/components/census-import").then((mod) => ({ default: mod.CensusImport })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="w-6 h-6 animate-spin mr-2" />
+        <span>Loading census import...</span>
+      </div>
+    ),
+  },
+)
+
+const CensusVisualization = dynamic(
+  () => import("@/components/census-visualization").then((mod) => ({ default: mod.CensusVisualization })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="w-6 h-6 animate-spin mr-2" />
+        <span>Loading census visualization...</span>
+      </div>
+    ),
+  },
+)
+
+const CensusDetailsTable = dynamic(
+  () => import("@/components/census-details-table").then((mod) => ({ default: mod.CensusDetailsTable })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="w-6 h-6 animate-spin mr-2" />
+        <span>Loading census details...</span>
       </div>
     ),
   },
@@ -160,6 +211,10 @@ export default function DataPage() {
     } finally {
       setLoadingCounts(false)
     }
+  }
+
+  const handleDataRefresh = () => {
+    loadSummaryCounts()
   }
 
   useEffect(() => {
@@ -298,30 +353,42 @@ export default function DataPage() {
         )}
 
         <Tabs defaultValue="browse" className="space-y-6">
-          <TabsList>
+          <TabsList className="grid w-full grid-cols-3 lg:grid-cols-9">
             <TabsTrigger value="browse" className="flex items-center space-x-2">
               <Table className="w-4 h-4" />
-              <span>Browse Data</span>
+              <span className="hidden sm:inline">Browse Data</span>
             </TabsTrigger>
             <TabsTrigger value="import" className="flex items-center space-x-2">
               <Upload className="w-4 h-4" />
-              <span>Import Data</span>
+              <span className="hidden sm:inline">Import Data</span>
             </TabsTrigger>
             <TabsTrigger value="coordinates" className="flex items-center space-x-2">
               <MapPin className="w-4 h-4" />
-              <span>Import Coordinates</span>
+              <span className="hidden sm:inline">Coordinates</span>
             </TabsTrigger>
             <TabsTrigger value="coordinate-details" className="flex items-center space-x-2">
               <Map className="w-4 h-4" />
-              <span>Coordinate Details</span>
+              <span className="hidden sm:inline">Coord Details</span>
             </TabsTrigger>
             <TabsTrigger value="boundaries" className="flex items-center space-x-2">
               <Map className="w-4 h-4" />
-              <span>Import Boundaries</span>
+              <span className="hidden sm:inline">Boundaries</span>
             </TabsTrigger>
             <TabsTrigger value="boundary-details" className="flex items-center space-x-2">
               <MapPin className="w-4 h-4" />
-              <span>Boundaries Details</span>
+              <span className="hidden sm:inline">Bound Details</span>
+            </TabsTrigger>
+            <TabsTrigger value="census-import" className="flex items-center space-x-2">
+              <BarChart3 className="w-4 h-4" />
+              <span className="hidden sm:inline">Census Import</span>
+            </TabsTrigger>
+            <TabsTrigger value="census-viz" className="flex items-center space-x-2">
+              <BarChart3 className="w-4 h-4" />
+              <span className="hidden sm:inline">Census Charts</span>
+            </TabsTrigger>
+            <TabsTrigger value="census-details" className="flex items-center space-x-2">
+              <Users className="w-4 h-4" />
+              <span className="hidden sm:inline">Census Details</span>
             </TabsTrigger>
           </TabsList>
 
@@ -347,6 +414,18 @@ export default function DataPage() {
 
           <TabsContent value="boundary-details">
             <BoundaryDetailsTable />
+          </TabsContent>
+
+          <TabsContent value="census-import">
+            <CensusImport onImportComplete={handleDataRefresh} />
+          </TabsContent>
+
+          <TabsContent value="census-viz">
+            <CensusVisualization onDataChange={handleDataRefresh} />
+          </TabsContent>
+
+          <TabsContent value="census-details">
+            <CensusDetailsTable onDataChange={handleDataRefresh} />
           </TabsContent>
         </Tabs>
       </main>

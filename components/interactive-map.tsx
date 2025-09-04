@@ -270,6 +270,9 @@ export function InteractiveMap({
             showDistrictMarkers={showDistrictMarkers}
             showCommuneMarkers={showCommuneMarkers}
             showVillageMarkers={showVillageMarkers}
+            showProvinceBoundaries={showProvinceBoundaries}
+            showDistrictBoundaries={showDistrictBoundaries}
+            showCommuneBoundaries={showCommuneBoundaries}
             mapType={mapType}
           />
 

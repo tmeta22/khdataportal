@@ -7,6 +7,7 @@ import { InteractiveMap } from "@/components/interactive-map"
 import { OverviewStats } from "@/components/overview-stats"
 import { SearchBar } from "@/components/search-bar"
 import PWAInstallPrompt from "@/components/pwa-install-prompt"
+import { createClient } from "@/lib/supabase/client"
 
 export const dynamic = "force-dynamic"
 
@@ -17,10 +18,55 @@ export default function HomePage() {
   const [selectedVillage, setSelectedVillage] = useState<string>("")
   const [searchQuery, setSearchQuery] = useState<string>("")
   const [mounted, setMounted] = useState(false)
+  const [statistics, setStatistics] = useState({
+    provinces: 25,
+    districts: 208,
+    communes: 1652,
+    villages: 14564,
+  })
+
+  const supabase = createClient()
 
   useEffect(() => {
     setMounted(true)
+    loadStatistics()
   }, [])
+
+  const loadStatistics = async () => {
+    try {
+      console.log("[v0] Loading administrative statistics for welcome message...")
+
+      const [provincesResult, districtsResult, khanResult, communesResult, sangkatResult, villagesResult] =
+        await Promise.all([
+          supabase.from("provinces").select("id", { count: "exact", head: true }),
+          supabase.from("districts").select("id", { count: "exact", head: true }),
+          supabase.from("khan").select("id", { count: "exact", head: true }),
+          supabase.from("communes").select("id", { count: "exact", head: true }),
+          supabase.from("sangkat").select("id", { count: "exact", head: true }),
+          supabase.from("villages").select("id", { count: "exact", head: true }),
+        ])
+
+      const totalDistricts = (districtsResult.count || 0) + (khanResult.count || 0)
+      const totalCommunes = (communesResult.count || 0) + (sangkatResult.count || 0)
+
+      setStatistics({
+        provinces: provincesResult.count || 25,
+        districts: totalDistricts || 208,
+        communes: totalCommunes || 1652,
+        villages: villagesResult.count || 14564,
+      })
+
+      console.log("[v0] Welcome message statistics loaded:", {
+        provinces: provincesResult.count,
+        districts: totalDistricts,
+        communes: totalCommunes,
+        villages: villagesResult.count,
+      })
+    } catch (error) {
+      console.error("[v0] Error loading welcome message statistics:", error)
+      // Keep default values on error
+    }
+  }
 
   const handleLocationSelect = (location: { type: string; name: string; code: string; id?: string }) => {
     console.log("[v0] Location selected from map:", location)
@@ -103,19 +149,19 @@ export default function HomePage() {
             <div className="flex items-center justify-center gap-4 mt-4 text-xs text-muted-foreground">
               <span className="flex items-center gap-1">
                 <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
-                25 Provinces
+                {statistics.provinces} Provinces
               </span>
               <span className="flex items-center gap-1">
                 <span className="w-2 h-2 bg-red-500 rounded-full"></span>
-                208 Districts
+                {statistics.districts.toLocaleString()} Districts
               </span>
               <span className="flex items-center gap-1">
                 <span className="w-2 h-2 bg-white border border-gray-300 rounded-full"></span>
-                1,652 Communes
+                {statistics.communes.toLocaleString()} Communes
               </span>
               <span className="flex items-center gap-1">
                 <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                14,564 Villages
+                {statistics.villages.toLocaleString()} Villages
               </span>
             </div>
           </div>
@@ -189,7 +235,6 @@ export default function HomePage() {
               </p>
             </div>
             <div className="flex items-center gap-4">
-              
               <span className="text-xs text-muted-foreground">© 2025 Cambodia Administrative Data Portal</span>
             </div>
           </div>
