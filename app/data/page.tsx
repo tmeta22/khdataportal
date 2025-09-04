@@ -21,6 +21,7 @@ import {
 } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { createClient } from "@/lib/supabase/client"
+import { useAuth } from "@/components/auth-provider"
 
 const DataTable = dynamic(() => import("@/components/data-table").then((mod) => ({ default: mod.DataTable })), {
   ssr: false,
@@ -142,8 +143,7 @@ interface SummaryCounts {
 
 export default function DataPage() {
   const router = useRouter()
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [authLoading, setAuthLoading] = useState(true)
+  const { isAuthenticated, isLoading: authLoading } = useAuth()
   const [dbError, setDbError] = useState<string | null>(null)
   const [summaryCounts, setSummaryCounts] = useState<SummaryCounts>({
     provinces: 0,
@@ -158,27 +158,6 @@ export default function DataPage() {
 
   useEffect(() => {
     setIsClient(true)
-
-    const checkAuth = () => {
-      try {
-        if (typeof window === "undefined") return
-
-        const savedAuth = localStorage.getItem("cambodia-admin-auth")
-        if (savedAuth) {
-          const authData = JSON.parse(savedAuth)
-          setIsAuthenticated(authData.isAuthenticated && authData.user)
-        } else {
-          setIsAuthenticated(false)
-        }
-      } catch (error) {
-        console.error("[v0] Error checking auth:", error)
-        setIsAuthenticated(false)
-      } finally {
-        setAuthLoading(false)
-      }
-    }
-
-    checkAuth()
   }, [])
 
   const loadSummaryCounts = async () => {

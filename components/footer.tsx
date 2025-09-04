@@ -38,7 +38,7 @@ export function Footer() {
       </footer>
 
       <Dialog open={showSupportDialog} onOpenChange={setShowSupportDialog}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md z-[9999] fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Heart className="w-5 h-5 text-red-600 fill-current" />
@@ -76,7 +76,11 @@ export function Footer() {
               <div className="text-center">
                 <h3 className="font-semibold mb-2">ABA PayWay</h3>
                 <div className="bg-gray-50 p-4 rounded-lg">
-                  <img src="/qr-code-for-aba-payway-payment.jpg" alt="ABA PayWay QR Code" className="w-32 h-32 mx-auto mb-2" />
+                  <img
+                    src="/qr-code-for-aba-payway-payment.jpg"
+                    alt="ABA PayWay QR Code"
+                    className="w-32 h-32 mx-auto mb-2"
+                  />
                   <Button
                     variant="outline"
                     size="sm"
