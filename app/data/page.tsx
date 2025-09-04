@@ -134,6 +134,19 @@ const CensusDetailsTable = dynamic(
   },
 )
 
+const PhnomPenhBulkManager = dynamic(
+  () => import("@/components/phnom-penh-bulk-manager").then((mod) => ({ default: mod.PhnomPenhBulkManager })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="w-6 h-6 animate-spin mr-2" />
+        <span>Loading bulk manager...</span>
+      </div>
+    ),
+  },
+)
+
 interface SummaryCounts {
   provinces: number
   districts: number
@@ -332,7 +345,7 @@ export default function DataPage() {
         )}
 
         <Tabs defaultValue="browse" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 lg:grid-cols-9">
+          <TabsList className="grid w-full grid-cols-3 lg:grid-cols-10">
             <TabsTrigger value="browse" className="flex items-center space-x-2">
               <Table className="w-4 h-4" />
               <span className="hidden sm:inline">Browse Data</span>
@@ -348,6 +361,10 @@ export default function DataPage() {
             <TabsTrigger value="coordinate-details" className="flex items-center space-x-2">
               <Map className="w-4 h-4" />
               <span className="hidden sm:inline">Coord Details</span>
+            </TabsTrigger>
+            <TabsTrigger value="phnom-penh-bulk" className="flex items-center space-x-2">
+              <Building className="w-4 h-4" />
+              <span className="hidden sm:inline">PP Bulk</span>
             </TabsTrigger>
             <TabsTrigger value="boundaries" className="flex items-center space-x-2">
               <Map className="w-4 h-4" />
@@ -385,6 +402,10 @@ export default function DataPage() {
 
           <TabsContent value="coordinate-details">
             <CoordinateDetailsTable />
+          </TabsContent>
+
+          <TabsContent value="phnom-penh-bulk">
+            <PhnomPenhBulkManager onDataChange={handleDataRefresh} />
           </TabsContent>
 
           <TabsContent value="boundaries">
