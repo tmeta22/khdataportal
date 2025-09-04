@@ -16,7 +16,7 @@ import { useAuth } from "@/components/auth-provider"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 
-const LocationMap = dynamic(() => import("@/components/location-map"), {
+const LeafletMap = dynamic(() => import("@/components/leaflet-map"), {
   ssr: false,
   loading: () => (
     <div className="w-full h-full bg-muted rounded-lg flex items-center justify-center">
@@ -262,9 +262,13 @@ export default function DetailsPage() {
 
     if (province) {
       const matchingCensus = censusData.find(
-        (c) => c.provinces.toLowerCase() === province.name_latin.toLowerCase() || c.pro_code === province.code,
+        (c) =>
+          c.provinces.toLowerCase() === province.name_latin.toLowerCase() ||
+          c.pro_code === province.code ||
+          c.provinces_kh === province.name_khmer,
       )
       setSelectedCensusData(matchingCensus || null)
+      console.log("[v0] Matched census data for province:", province.name_latin, matchingCensus ? "Found" : "Not found")
     }
   }
 
@@ -506,66 +510,107 @@ export default function DetailsPage() {
                         </Button>
                       )}
                     </div>
+                    {selectedCensusData && (
+                      <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                        <div className="flex items-center gap-2 mb-2">
+                          <BarChart3 className="w-4 h-4 text-blue-600" />
+                          <span className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                            Census Data Available ({selectedCensusData.year})
+                          </span>
+                        </div>
+                        <p className="text-xs text-blue-600 dark:text-blue-300">
+                          Official demographic data from Cambodia's {selectedCensusData.year} census
+                        </p>
+                      </div>
+                    )}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-3">
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Population</span>
-                          <span className="font-medium">
-                            {selectedCensusData?.total?.toLocaleString() ||
-                              selectedProvince.population.toLocaleString()}
-                          </span>
+                      <div className="space-y-4">
+                        <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
+                          Population Statistics
+                        </h4>
+                        <div className="space-y-3">
+                          <div className="flex justify-between items-center py-2 border-b border-muted">
+                            <span className="text-muted-foreground">Total Population</span>
+                            <span className="font-semibold text-lg">
+                              {selectedCensusData?.total?.toLocaleString() ||
+                                selectedProvince.population.toLocaleString()}
+                            </span>
+                          </div>
+                          {selectedCensusData && (
+                            <>
+                              <div className="flex justify-between items-center py-2 border-b border-muted">
+                                <span className="text-muted-foreground">Males</span>
+                                <span className="font-medium">
+                                  {selectedCensusData.males.toLocaleString()}
+                                  <span className="text-xs text-muted-foreground ml-1">
+                                    ({((selectedCensusData.males / selectedCensusData.total) * 100).toFixed(1)}%)
+                                  </span>
+                                </span>
+                              </div>
+                              <div className="flex justify-between items-center py-2 border-b border-muted">
+                                <span className="text-muted-foreground">Females</span>
+                                <span className="font-medium">
+                                  {selectedCensusData.females.toLocaleString()}
+                                  <span className="text-xs text-muted-foreground ml-1">
+                                    ({((selectedCensusData.females / selectedCensusData.total) * 100).toFixed(1)}%)
+                                  </span>
+                                </span>
+                              </div>
+                              <div className="flex justify-between items-center py-2 border-b border-muted">
+                                <span className="text-muted-foreground">Total Households</span>
+                                <span className="font-medium">{selectedCensusData.households.toLocaleString()}</span>
+                              </div>
+                              <div className="flex justify-between items-center py-2 border-b border-muted">
+                                <span className="text-muted-foreground">Average Household Size</span>
+                                <span className="font-medium">
+                                  {selectedCensusData.household_size.toFixed(1)} persons
+                                </span>
+                              </div>
+                            </>
+                          )}
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Population Density</span>
-                          <span className="font-medium">
-                            {selectedCensusData?.pop_km2?.toFixed(1) ||
-                              (selectedProvince.area > 0
-                                ? Math.round(selectedProvince.population / selectedProvince.area)
-                                : 0)}
-                            /km²
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Households</span>
-                          <span className="font-medium">
-                            {selectedCensusData?.households?.toLocaleString() ||
-                              Math.round(selectedProvince.population / 4).toLocaleString()}
-                          </span>
-                        </div>
-                        {selectedCensusData && (
-                          <>
-                            <div className="flex justify-between">
-                              <span className="text-muted-foreground">Males</span>
-                              <span className="font-medium">{selectedCensusData.males.toLocaleString()}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-muted-foreground">Females</span>
-                              <span className="font-medium">{selectedCensusData.females.toLocaleString()}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-muted-foreground">Household Size</span>
-                              <span className="font-medium">{selectedCensusData.household_size.toFixed(1)}</span>
-                            </div>
-                            <div className="flex justify-between">
+                      </div>
+                      <div className="space-y-4">
+                        <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
+                          Geographic Statistics
+                        </h4>
+                        <div className="space-y-3">
+                          <div className="flex justify-between items-center py-2 border-b border-muted">
+                            <span className="text-muted-foreground">Total Area</span>
+                            <span className="font-medium">
+                              {selectedCensusData?.area_km2?.toLocaleString() || selectedProvince.area.toLocaleString()}{" "}
+                              km²
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center py-2 border-b border-muted">
+                            <span className="text-muted-foreground">Population Density</span>
+                            <span className="font-medium">
+                              {selectedCensusData?.pop_km2?.toFixed(1) ||
+                                (selectedProvince.area > 0
+                                  ? Math.round(selectedProvince.population / selectedProvince.area)
+                                  : 0)}{" "}
+                              people/km²
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center py-2 border-b border-muted">
+                            <span className="text-muted-foreground">Administrative Sub-divisions</span>
+                            <span className="font-medium">{selectedProvince.subdivisions}</span>
+                          </div>
+                          {selectedCensusData && (
+                            <div className="flex justify-between items-center py-2 border-b border-muted">
                               <span className="text-muted-foreground">Census Year</span>
                               <span className="font-medium">{selectedCensusData.year}</span>
                             </div>
-                          </>
-                        )}
-                      </div>
-                      <div className="space-y-3">
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Area</span>
-                          <span className="font-medium">
-                            {selectedCensusData?.area_km2?.toLocaleString() || selectedProvince.area.toLocaleString()}{" "}
-                            km²
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Sub-divisions</span>
-                          <span className="font-medium">{selectedProvince.subdivisions}</span>
+                          )}
                         </div>
                       </div>
+                    </div>
+                    <div className="mt-6 pt-4 border-t border-muted">
+                      <p className="text-xs text-muted-foreground">
+                        {selectedCensusData
+                          ? `Data source: Cambodia Provisional Census ${selectedCensusData.year}, National Institute of Statistics`
+                          : "Population estimates based on administrative records"}
+                      </p>
                     </div>
                   </Card>
                 </TabsContent>
@@ -622,7 +667,32 @@ export default function DetailsPage() {
               <Card className="p-4">
                 <h3 className="font-semibold mb-4">Location Map</h3>
                 <div className="aspect-square bg-muted rounded-lg relative overflow-hidden">
-                  {selectedProvince && <LocationMap key={selectedProvince.id} province={selectedProvince} />}
+                  {selectedProvince && (
+                    <LeafletMap
+                      provinces={[selectedProvince]}
+                      districts={[]}
+                      communes={[]}
+                      villages={[]}
+                      khan={[]}
+                      sangkat={[]}
+                      boundaries={[]}
+                      layerStates={{
+                        provinces: true,
+                        districts: false,
+                        communes: false,
+                        villages: false,
+                        khan: false,
+                        sangkat: false,
+                        provinceBoundaries: false,
+                        districtBoundaries: false,
+                        communeBoundaries: false,
+                      }}
+                      selectedProvince={selectedProvince.id}
+                      onLocationSelect={(location) => {
+                        console.log("[v0] Location selected from details map:", location)
+                      }}
+                    />
+                  )}
                 </div>
               </Card>
 

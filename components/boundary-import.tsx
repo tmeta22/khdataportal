@@ -76,6 +76,9 @@ export function BoundaryImport({ onImportComplete }: BoundaryImportProps) {
 
   const matchAdministrativeUnit = async (properties: any, type: string) => {
     const possibleCodeFields = [
+      "ADM1_PCODE",
+      "ADM2_PCODE",
+      "ADM3_PCODE", // Standard PCODE fields
       "code",
       "CODE",
       "ADM_CODE",
@@ -88,11 +91,14 @@ export function BoundaryImport({ onImportComplete }: BoundaryImportProps) {
       "PROVINCE_CODE",
       "DISTRICT_CODE",
       "COMMUNE_CODE",
-      "ADM1_PCODE",
-      "ADM2_PCODE",
-      "ADM3_PCODE",
     ]
     const possibleNameFields = [
+      "ADM1_EN",
+      "ADM2_EN",
+      "ADM3_EN", // Standard English name fields
+      "ADM1_KH",
+      "ADM2_KH",
+      "ADM3_KH", // Standard Khmer name fields
       "name",
       "NAME",
       "ADM_NAME",
@@ -114,6 +120,7 @@ export function BoundaryImport({ onImportComplete }: BoundaryImportProps) {
     let code = null
     let name = null
 
+    // Try to find code first (more reliable)
     for (const field of possibleCodeFields) {
       if (properties[field] !== undefined && properties[field] !== null && properties[field] !== "") {
         code = properties[field].toString().trim()
@@ -122,6 +129,7 @@ export function BoundaryImport({ onImportComplete }: BoundaryImportProps) {
       }
     }
 
+    // Try to find name
     for (const field of possibleNameFields) {
       if (properties[field] !== undefined && properties[field] !== null && properties[field] !== "") {
         name = properties[field].toString().trim()
@@ -150,23 +158,57 @@ export function BoundaryImport({ onImportComplete }: BoundaryImportProps) {
         return null
     }
 
-    let query = supabase.from(tableName).select("id, code, name_latin, name_khmer")
+    const query = supabase.from(tableName).select("id, code, name_latin, name_khmer")
 
     if (code) {
-      query = query.eq("code", code)
-    } else if (name) {
-      query = query.or(`name_latin.ilike.%${name}%,name_khmer.ilike.%${name}%`)
+      // Try exact code match first
+      const { data: exactMatch } = await query.eq("code", code).limit(1).single()
+      if (exactMatch) {
+        console.log(`[v0] Exact code match found for ${type}:`, exactMatch.name_latin)
+        return exactMatch
+      }
+
+      // Try code as substring
+      const { data: codeSubstring } = await supabase
+        .from(tableName)
+        .select("id, code, name_latin, name_khmer")
+        .ilike("code", `%${code}%`)
+        .limit(1)
+        .single()
+      if (codeSubstring) {
+        console.log(`[v0] Code substring match found for ${type}:`, codeSubstring.name_latin)
+        return codeSubstring
+      }
     }
 
-    const { data, error } = await query.limit(1).single()
+    if (name) {
+      // Try exact name match (case insensitive)
+      const { data: exactNameMatch } = await supabase
+        .from(tableName)
+        .select("id, code, name_latin, name_khmer")
+        .or(`name_latin.ilike.${name},name_khmer.ilike.${name}`)
+        .limit(1)
+        .single()
+      if (exactNameMatch) {
+        console.log(`[v0] Exact name match found for ${type}:`, exactNameMatch.name_latin)
+        return exactNameMatch
+      }
 
-    if (error || !data) {
-      console.log(`[v0] No match found for ${type} with code: ${code}, name: ${name}`)
-      return null
+      // Try fuzzy name matching
+      const { data: fuzzyMatches } = await supabase
+        .from(tableName)
+        .select("id, code, name_latin, name_khmer")
+        .or(`name_latin.ilike.%${name}%,name_khmer.ilike.%${name}%`)
+        .limit(5)
+
+      if (fuzzyMatches && fuzzyMatches.length > 0) {
+        console.log(`[v0] Fuzzy name match found for ${type}:`, fuzzyMatches[0].name_latin)
+        return fuzzyMatches[0]
+      }
     }
 
-    console.log(`[v0] Successfully matched ${type}:`, data.name_latin)
-    return data
+    console.log(`[v0] No match found for ${type} with code: ${code}, name: ${name}`)
+    return null
   }
 
   const handleImport = async () => {
@@ -395,10 +437,13 @@ export function BoundaryImport({ onImportComplete }: BoundaryImportProps) {
             <li>• Each feature should have geometry and properties</li>
             <li>• Properties should include administrative code or name</li>
             <li>
-              • <strong>Supported code fields:</strong> code, CODE, ADM_CODE, PCODE, pro_code, dis_code, com_code
+              • <strong>Supported code fields:</strong> ADM1_PCODE, ADM2_PCODE, ADM3_PCODE, code, CODE, ADM_CODE, PCODE,
+              id, ID, pro_code, dis_code, com_code, PROVINCE_CODE, DISTRICT_CODE, COMMUNE_CODE
             </li>
             <li>
-              • <strong>Supported name fields:</strong> name, NAME, ADM_NAME, NAME_EN, PROVINCE, DISTRICT, COMMUNE
+              • <strong>Supported name fields:</strong> ADM1_EN, ADM2_EN, ADM3_EN, ADM1_KH, ADM2_KH, ADM3_KH, name,
+              NAME, ADM_NAME, NAME_EN, name_en, NAME_KH, name_kh, PROVINCE, DISTRICT, COMMUNE, pro_name, dis_name,
+              com_name, PROVINCE_NAME, DISTRICT_NAME, COMMUNE_NAME
             </li>
           </ul>
         </div>
