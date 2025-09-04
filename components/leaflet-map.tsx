@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
-import { ZoomIn, ZoomOut, Maximize2, Map, Satellite, Eye } from "lucide-react"
+import { ZoomIn, ZoomOut, Maximize2 } from "lucide-react"
 
 interface LeafletMapProps {
   provinces: any[]
@@ -18,6 +18,7 @@ interface LeafletMapProps {
   onZoomChange?: (zoom: number) => void
   isFullscreen?: boolean
   onFullscreenToggle?: () => void
+  currentTileLayer?: string
 }
 
 export default function LeafletMap({
@@ -34,13 +35,13 @@ export default function LeafletMap({
   onZoomChange,
   isFullscreen,
   onFullscreenToggle,
+  currentTileLayer = "osm",
 }: LeafletMapProps) {
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<any>(null)
   const markersRef = useRef<any[]>([])
   const boundaryLayersRef = useRef<any[]>([])
   const [leafletLoaded, setLeafletLoaded] = useState(false)
-  const [currentTileLayer, setCurrentTileLayer] = useState("osm")
   const [L, setL] = useState<any>(null)
 
   useEffect(() => {
@@ -211,7 +212,20 @@ export default function LeafletMap({
               color: "#3b82f6",
               weight: 2,
               opacity: 0.8,
+              fillColor: "#3b82f6",
               fillOpacity: 0.1,
+            },
+            onEachFeature: (feature: any, layer: any) => {
+              if (feature.properties) {
+                const props = feature.properties
+                layer.bindPopup(`
+                  <div class="p-2">
+                    <h3 class="font-semibold">${props.ADM1_EN || props.NAME_1 || "Province Boundary"}</h3>
+                    <p class="text-sm text-gray-600">Administrative Boundary</p>
+                    ${props.ADM1_PCODE ? `<p class="text-xs">Code: ${props.ADM1_PCODE}</p>` : ""}
+                  </div>
+                `)
+              }
             },
           })
 
@@ -227,7 +241,7 @@ export default function LeafletMap({
     })
   }, [boundaries, layerStates.provinceBoundaries, L])
 
-  const handleTileLayerChange = (layerType: string) => {
+  useEffect(() => {
     if (!mapInstanceRef.current?.map || !mapInstanceRef.current?.tileLayers) return
 
     const { map, tileLayers } = mapInstanceRef.current
@@ -238,11 +252,10 @@ export default function LeafletMap({
     })
 
     // Add new tile layer
-    if (tileLayers[layerType]) {
-      tileLayers[layerType].addTo(map)
-      setCurrentTileLayer(layerType)
+    if (tileLayers[currentTileLayer]) {
+      tileLayers[currentTileLayer].addTo(map)
     }
-  }
+  }, [currentTileLayer])
 
   const handleZoom = (direction: "in" | "out") => {
     if (!mapInstanceRef.current?.map) return
@@ -269,51 +282,17 @@ export default function LeafletMap({
   return (
     <div className="relative w-full h-full">
       <div ref={mapRef} className="w-full h-full rounded-lg" />
-      {/* Map Controls */}
-      <div className="absolute top-4 right-4 flex flex-col gap-2">
-        {/* Tile Layer Controls */}
-        <div className="flex gap-1 bg-white rounded-lg shadow-lg p-1">
-          <Button
-            variant={currentTileLayer === "osm" ? "default" : "ghost"}
-            size="sm"
-            onClick={() => handleTileLayerChange("osm")}
-            className="text-xs"
-          >
-            <Map className="w-4 h-4 mr-1" />
-            Map
-          </Button>
-          <Button
-            variant={currentTileLayer === "satellite" ? "default" : "ghost"}
-            size="sm"
-            onClick={() => handleTileLayerChange("satellite")}
-            className="text-xs"
-          >
-            <Satellite className="w-4 h-4 mr-1" />
-            Satellite
-          </Button>
-          <Button
-            variant={currentTileLayer === "hybrid" ? "default" : "ghost"}
-            size="sm"
-            onClick={() => handleTileLayerChange("hybrid")}
-            className="text-xs"
-          >
-            <Eye className="w-4 h-4 mr-1" />
-            Satellite + Labels
-          </Button>
-        </div>
-
-        {/* Zoom Controls */}
-        <div className="flex flex-col gap-1 bg-white rounded-lg shadow-lg p-1">
-          <Button variant="ghost" size="sm" onClick={() => handleZoom("in")}>
-            <ZoomIn className="w-4 h-4" />
-          </Button>
-          <Button variant="ghost" size="sm" onClick={() => handleZoom("out")}>
-            <ZoomOut className="w-4 h-4" />
-          </Button>
-          <Button variant="ghost" size="sm" onClick={onFullscreenToggle}>
-            <Maximize2 className="w-4 h-4" />
-          </Button>
-        </div>
+      {/* Zoom Controls */}
+      <div className="absolute top-4 right-4 flex flex-col gap-1 bg-white rounded-lg shadow-lg p-1">
+        <Button variant="ghost" size="sm" onClick={() => handleZoom("in")}>
+          <ZoomIn className="w-4 h-4" />
+        </Button>
+        <Button variant="ghost" size="sm" onClick={() => handleZoom("out")}>
+          <ZoomOut className="w-4 h-4" />
+        </Button>
+        <Button variant="ghost" size="sm" onClick={onFullscreenToggle}>
+          <Maximize2 className="w-4 h-4" />
+        </Button>
       </div>
     </div>
   )
