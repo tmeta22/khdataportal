@@ -26,7 +26,6 @@ export default function LocationMap({ province }: LocationMapProps) {
       if (typeof window === "undefined") return
 
       try {
-        // Load Leaflet CSS
         if (!document.querySelector('link[href*="leaflet"]')) {
           const link = document.createElement("link")
           link.rel = "stylesheet"
@@ -34,9 +33,17 @@ export default function LocationMap({ province }: LocationMapProps) {
           document.head.appendChild(link)
         }
 
-        // Load Leaflet JS
-        const L = await import("leaflet")
-        const leaflet = L.default || L
+        if (!(window as any).L) {
+          await new Promise((resolve, reject) => {
+            const script = document.createElement("script")
+            script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+            script.onload = resolve
+            script.onerror = reject
+            document.head.appendChild(script)
+          })
+        }
+
+        const L = (window as any).L
 
         // Clean up existing map instance
         if (mapInstanceRef.current) {
@@ -51,15 +58,15 @@ export default function LocationMap({ province }: LocationMapProps) {
           try {
             console.log("[v0] Initializing map for province:", province.name_latin)
 
-            delete (leaflet.Icon.Default.prototype as any)._getIconUrl
-            leaflet.Icon.Default.mergeOptions({
+            delete (L.Icon.Default.prototype as any)._getIconUrl
+            L.Icon.Default.mergeOptions({
               iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
               iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
               shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
             })
 
             // Create map instance with proper center and zoom
-            const map = leaflet.map(mapRef.current, {
+            const map = L.map(mapRef.current, {
               center: [province.latitude, province.longitude],
               zoom: 9,
               zoomControl: true,
@@ -70,14 +77,12 @@ export default function LocationMap({ province }: LocationMapProps) {
             mapInstanceRef.current = map
 
             // Add tile layer
-            leaflet
-              .tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-                attribution: "© OpenStreetMap contributors",
-                maxZoom: 18,
-              })
-              .addTo(map)
+            L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+              attribution: "© OpenStreetMap contributors",
+              maxZoom: 18,
+            }).addTo(map)
 
-            const selectedIcon = leaflet.divIcon({
+            const selectedIcon = L.divIcon({
               className: "custom-marker-selected",
               html: `<div style="
                 background-color: #3b82f6;
@@ -93,8 +98,7 @@ export default function LocationMap({ province }: LocationMapProps) {
             })
 
             // Add marker for selected province
-            const marker = leaflet
-              .marker([province.latitude, province.longitude], { icon: selectedIcon })
+            const marker = L.marker([province.latitude, province.longitude], { icon: selectedIcon })
               .addTo(map)
               .bindPopup(`
                 <div style="text-align: center; padding: 4px;">
@@ -107,7 +111,7 @@ export default function LocationMap({ province }: LocationMapProps) {
 
             markerRef.current = marker
 
-            const bounds = leaflet.latLngBounds([[province.latitude, province.longitude]])
+            const bounds = L.latLngBounds([[province.latitude, province.longitude]])
             map.fitBounds(bounds, { padding: [20, 20] })
 
             console.log("[v0] Map initialized successfully")
