@@ -548,11 +548,10 @@ export default function MapComponent({
       return
     }
 
-    const allDistricts = [...districts, ...khan]
-    console.log("[v0] Adding district/khan markers:", allDistricts.length)
+    console.log("[v0] Adding district markers:", districts.length)
     let markersAdded = 0
 
-    allDistricts.forEach((district) => {
+    districts.forEach((district) => {
       if (district.latitude && district.longitude) {
         try {
           const customIcon = L.icon({
@@ -571,18 +570,15 @@ export default function MapComponent({
             shadowSize: [33, 33],
           })
 
-          const isKhan = !district.district_id && district.province_id
-          const unitType = isKhan ? "Khan" : "District"
-
           const marker = L.marker([district.latitude, district.longitude], { icon: customIcon })
             .addTo(mapInstanceRef.current)
             .bindPopup(`
               <div class="p-2">
                 <h3 class="font-semibold text-orange-600">${district.name_latin} (${district.code || district.id})</h3>
                 <p class="text-sm font-khmer">${district.name_khmer}</p>
-                <p class="text-xs text-orange-500">${unitType}</p>
+                <p class="text-xs text-orange-500">District</p>
                 <p class="text-xs text-gray-400">Lat: ${district.latitude}, Lng: ${district.longitude}</p>
-                <button onclick="handleDeletePin('${isKhan ? "khan" : "district"}', '${district.id}')" class="mt-2 px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600">
+                <button onclick="handleDeletePin('district', '${district.id}')" class="mt-2 px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600">
                   Delete Pin
                 </button>
               </div>
@@ -590,7 +586,7 @@ export default function MapComponent({
 
           marker.on("click", () => {
             onLocationSelect?.({
-              type: isKhan ? "khan" : "district",
+              type: "district",
               name: district.name_latin,
               code: district.code || district.id,
             })
@@ -599,23 +595,81 @@ export default function MapComponent({
           markersRef.current.push(marker)
           markersAdded++
         } catch (error) {
-          console.error("[v0] Error creating district/khan marker:", error)
+          console.error("[v0] Error creating district marker:", error)
         }
       }
     })
-    console.log("[v0] Total district/khan markers added:", markersAdded)
-  }, [districts, khan, showDistrictMarkers, onLocationSelect])
+    console.log("[v0] Total district markers added:", markersAdded)
+  }, [districts, showDistrictMarkers, onLocationSelect])
+
+  const addKhanMarkers = useCallback(() => {
+    if (!mapInstanceRef.current || khan.length === 0 || !showKhanMarkers) {
+      return
+    }
+
+    console.log("[v0] Adding khan markers:", khan.length)
+    let markersAdded = 0
+
+    khan.forEach((khanUnit) => {
+      if (khanUnit.latitude && khanUnit.longitude) {
+        try {
+          const customIcon = L.icon({
+            iconUrl:
+              "data:image/svg+xml;base64," +
+              btoa(`
+                <svg width="25" height="41" viewBox="0 0 25 41" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12.5 0C5.6 0 0 5.6 0 12.5c0 12.5 12.5 28.5 12.5 28.5s12.5-16 12.5-28.5C25 5.6 19.4 0 12.5 0z" fill="#f59e0b"/>
+                  <circle cx="12.5" cy="12.5" r="6" fill="white"/>
+                </svg>
+              `),
+            shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
+            iconSize: [20, 33],
+            iconAnchor: [10, 33],
+            popupAnchor: [1, -28],
+            shadowSize: [33, 33],
+          })
+
+          const marker = L.marker([khanUnit.latitude, khanUnit.longitude], { icon: customIcon })
+            .addTo(mapInstanceRef.current)
+            .bindPopup(`
+              <div class="p-2">
+                <h3 class="font-semibold text-amber-600">${khanUnit.name_latin} (${khanUnit.code || khanUnit.id})</h3>
+                <p class="text-sm font-khmer">${khanUnit.name_khmer}</p>
+                <p class="text-xs text-amber-500">Khan (Urban District)</p>
+                <p class="text-xs text-gray-400">Lat: ${khanUnit.latitude}, Lng: ${khanUnit.longitude}</p>
+                <button onclick="handleDeletePin('khan', '${khanUnit.id}')" class="mt-2 px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600">
+                  Delete Pin
+                </button>
+              </div>
+            `)
+
+          marker.on("click", () => {
+            onLocationSelect?.({
+              type: "khan",
+              name: khanUnit.name_latin,
+              code: khanUnit.code || khanUnit.id,
+            })
+          })
+
+          markersRef.current.push(marker)
+          markersAdded++
+        } catch (error) {
+          console.error("[v0] Error creating khan marker:", error)
+        }
+      }
+    })
+    console.log("[v0] Total khan markers added:", markersAdded)
+  }, [khan, showKhanMarkers, onLocationSelect])
 
   const addCommuneMarkers = useCallback(() => {
     if (!mapInstanceRef.current || !showCommuneMarkers) {
       return
     }
 
-    const allCommunes = [...communes, ...sangkat]
-    console.log("[v0] Adding commune/sangkat markers:", allCommunes.length)
+    console.log("[v0] Adding commune markers:", communes.length)
     let markersAdded = 0
 
-    allCommunes.forEach((commune) => {
+    communes.forEach((commune) => {
       if (commune.latitude && commune.longitude) {
         try {
           const customIcon = L.icon({
@@ -634,18 +688,15 @@ export default function MapComponent({
             shadowSize: [29, 29],
           })
 
-          const isSangkat = commune.khan_id && !commune.district_id
-          const unitType = isSangkat ? "Sangkat" : "Commune"
-
           const marker = L.marker([commune.latitude, commune.longitude], { icon: customIcon })
             .addTo(mapInstanceRef.current)
             .bindPopup(`
               <div class="p-2">
                 <h3 class="font-semibold text-green-600">${commune.name_latin} (${commune.code || commune.id})</h3>
                 <p class="text-sm font-khmer">${commune.name_khmer}</p>
-                <p class="text-xs text-green-500">${unitType}</p>
+                <p class="text-xs text-green-500">Commune</p>
                 <p class="text-xs text-gray-400">Lat: ${commune.latitude}, Lng: ${commune.longitude}</p>
-                <button onclick="handleDeletePin('${isSangkat ? "sangkat" : "commune"}', '${commune.id}')" class="mt-2 px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600">
+                <button onclick="handleDeletePin('commune', '${commune.id}')" class="mt-2 px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600">
                   Delete Pin
                 </button>
               </div>
@@ -653,7 +704,7 @@ export default function MapComponent({
 
           marker.on("click", () => {
             onLocationSelect?.({
-              type: isSangkat ? "sangkat" : "commune",
+              type: "commune",
               name: commune.name_latin,
               code: commune.code || commune.id,
             })
@@ -662,12 +713,71 @@ export default function MapComponent({
           markersRef.current.push(marker)
           markersAdded++
         } catch (error) {
-          console.error("[v0] Error creating commune/sangkat marker:", error)
+          console.error("[v0] Error creating commune marker:", error)
         }
       }
     })
-    console.log("[v0] Total commune/sangkat markers added:", markersAdded)
-  }, [communes, sangkat, showCommuneMarkers, onLocationSelect])
+    console.log("[v0] Total commune markers added:", markersAdded)
+  }, [communes, showCommuneMarkers, onLocationSelect])
+
+  const addSangkatMarkers = useCallback(() => {
+    if (!mapInstanceRef.current || sangkat.length === 0 || !showSangkatMarkers) {
+      return
+    }
+
+    console.log("[v0] Adding sangkat markers:", sangkat.length)
+    let markersAdded = 0
+
+    sangkat.forEach((sangkatUnit) => {
+      if (sangkatUnit.latitude && sangkatUnit.longitude) {
+        try {
+          const customIcon = L.icon({
+            iconUrl:
+              "data:image/svg+xml;base64," +
+              btoa(`
+                <svg width="25" height="41" viewBox="0 0 25 41" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12.5 0C5.6 0 0 5.6 0 12.5c0 12.5 12.5 28.5 12.5 28.5s12.5-16 12.5-28.5C25 5.6 19.4 0 12.5 0z" fill="#10b981"/>
+                  <circle cx="12.5" cy="12.5" r="6" fill="white"/>
+                </svg>
+              `),
+            shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
+            iconSize: [18, 29],
+            iconAnchor: [9, 29],
+            popupAnchor: [1, -24],
+            shadowSize: [29, 29],
+          })
+
+          const marker = L.marker([sangkatUnit.latitude, sangkatUnit.longitude], { icon: customIcon })
+            .addTo(mapInstanceRef.current)
+            .bindPopup(`
+              <div class="p-2">
+                <h3 class="font-semibold text-emerald-600">${sangkatUnit.name_latin} (${sangkatUnit.code || sangkatUnit.id})</h3>
+                <p class="text-sm font-khmer">${sangkatUnit.name_khmer}</p>
+                <p class="text-xs text-emerald-500">Sangkat (Urban Commune)</p>
+                <p class="text-xs text-gray-400">Lat: ${sangkatUnit.latitude}, Lng: ${sangkatUnit.longitude}</p>
+                <button onclick="handleDeletePin('sangkat', '${sangkatUnit.id}')" class="mt-2 px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600">
+                  Delete Pin
+                </button>
+              </div>
+            `)
+
+          marker.on("click", () => {
+            onLocationSelect?.({
+              type: "sangkat",
+              name: sangkatUnit.name_latin,
+              code: sangkatUnit.code || sangkatUnit.id,
+            })
+          })
+
+          markersRef.current.push(marker)
+          markersAdded++
+        } catch (error) {
+          console.error("[v0] Error creating sangkat marker:", error)
+        }
+      }
+    })
+    console.log("[v0] Total sangkat markers added:", markersAdded)
+  }, [sangkat, showSangkatMarkers, onLocationSelect])
 
   const addVillageMarkers = useCallback(() => {
     if (!mapInstanceRef.current || villages.length === 0 || !showVillageMarkers) {
@@ -893,13 +1003,13 @@ export default function MapComponent({
         addProvinceMarkers()
       }
       if (showKhanMarkers && khan.length > 0) {
-        addDistrictMarkers()
+        addKhanMarkers()
       }
       if (showDistrictMarkers && districts.length > 0) {
         addDistrictMarkers()
       }
       if (showSangkatMarkers && sangkat.length > 0) {
-        addCommuneMarkers()
+        addSangkatMarkers()
       }
       if (showCommuneMarkers && communes.length > 0) {
         addCommuneMarkers()
@@ -958,9 +1068,9 @@ export default function MapComponent({
     sangkat,
     showProvinceMarkers,
     showDistrictMarkers,
-    showKhanMarkers, // Add showKhanMarkers dependency
+    showKhanMarkers,
     showCommuneMarkers,
-    showSangkatMarkers, // Add showSangkatMarkers dependency
+    showSangkatMarkers,
     showVillageMarkers,
     showProvinceBoundaries,
     showDistrictBoundaries,

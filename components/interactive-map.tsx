@@ -275,11 +275,6 @@ export function InteractiveMap({
             {legendVisible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
           </Button>
         </div>
-        {legendVisible && (
-          <div className="max-w-sm">
-            <EnhancedMapLegend onLayerToggle={handleLayerToggle} layerStates={layerStates} statistics={statistics} />
-          </div>
-        )}
       </div>
 
       <Card>
@@ -294,6 +289,16 @@ export function InteractiveMap({
         </CardHeader>
         <CardContent>
           <div className={`relative rounded-lg overflow-hidden ${isFullscreen ? "h-[calc(100vh-200px)]" : "h-96"}`}>
+            {legendVisible && (
+              <div className="absolute top-4 right-4 z-[1002] max-w-xs">
+                <EnhancedMapLegend
+                  onLayerToggle={handleLayerToggle}
+                  layerStates={layerStates}
+                  statistics={statistics}
+                />
+              </div>
+            )}
+
             <MapComponent
               selectedProvince={selectedProvince}
               selectedDistrict={selectedDistrict}
