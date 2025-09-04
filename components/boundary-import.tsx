@@ -182,11 +182,19 @@ export function BoundaryImport({ onImportComplete }: BoundaryImportProps) {
     }
 
     if (name) {
+      const nameMapping: { [key: string]: string } = {
+        Siemreap: "Siem Reap",
+        "Tboung Khmum": "Tbong Khmum",
+        "Phnom Penh": "Phnom Penh Capital",
+      }
+
+      const mappedName = nameMapping[name] || name
+
       // Try exact name match (case insensitive)
       const { data: exactNameMatch } = await supabase
         .from(tableName)
         .select("id, code, name_latin, name_khmer")
-        .or(`name_latin.ilike.${name},name_khmer.ilike.${name}`)
+        .or(`name_latin.ilike.${mappedName},name_khmer.ilike.${mappedName}`)
         .limit(1)
         .single()
       if (exactNameMatch) {
@@ -194,11 +202,11 @@ export function BoundaryImport({ onImportComplete }: BoundaryImportProps) {
         return exactNameMatch
       }
 
-      // Try fuzzy name matching
+      // Try fuzzy name matching with mapped name
       const { data: fuzzyMatches } = await supabase
         .from(tableName)
         .select("id, code, name_latin, name_khmer")
-        .or(`name_latin.ilike.%${name}%,name_khmer.ilike.%${name}%`)
+        .or(`name_latin.ilike.%${mappedName}%,name_khmer.ilike.%${mappedName}%`)
         .limit(5)
 
       if (fuzzyMatches && fuzzyMatches.length > 0) {

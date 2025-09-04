@@ -50,6 +50,8 @@ export function InteractiveMap({
     districts: 0,
     communes: 0,
     villages: 0,
+    khan: 0,
+    sangkat: 0,
   })
 
   const supabase = createClient()
@@ -120,6 +122,8 @@ export function InteractiveMap({
         districts: totalDistricts,
         communes: totalCommunes,
         villages: villagesResult.count || 0,
+        khan: khanResult.count || 0,
+        sangkat: sangkatResult.count || 0,
       })
 
       console.log("[v0] Loaded statistics:", {
@@ -127,6 +131,8 @@ export function InteractiveMap({
         districts: totalDistricts,
         communes: totalCommunes,
         villages: villagesResult.count || 0,
+        khan: khanResult.count || 0,
+        sangkat: sangkatResult.count || 0,
       })
     } catch (error) {
       console.error("[v0] Error loading statistics:", error)
@@ -195,7 +201,12 @@ export function InteractiveMap({
               <span>Selected: {selectedRegions} regions</span>
               <span>
                 Total Locations:{" "}
-                {statistics.provinces + statistics.districts + statistics.communes + statistics.villages}
+                {statistics.provinces +
+                  statistics.districts +
+                  statistics.communes +
+                  statistics.villages +
+                  statistics.khan +
+                  statistics.sangkat}
               </span>
               {selectedRegions === 0 ? <span>Click markers to select locations</span> : <span>Location selected</span>}
             </div>
