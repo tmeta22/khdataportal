@@ -24,6 +24,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { useAuth } from "@/components/auth-provider"
 import { LoginDialog } from "@/components/login-dialog"
 import { ThemeSelector } from "@/components/theme-selector"
+import { ChangelogDialog } from "@/components/changelog-dialog"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
@@ -33,6 +34,7 @@ export function Header() {
   const [showLoginDialog, setShowLoginDialog] = useState(false)
   const [showMobileMenu, setShowMobileMenu] = useState(false)
   const [showContactDialog, setShowContactDialog] = useState(false)
+  const [showChangelogDialog, setShowChangelogDialog] = useState(false)
   const [contactInfo, setContactInfo] = useState({
     email: "",
     phone: "",
@@ -209,7 +211,13 @@ export function Header() {
                 <Phone className="w-4 h-4" />
               </Button>
 
-              <Button variant="ghost" size="sm" className="hidden md:inline-flex">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="hidden md:inline-flex"
+                onClick={() => setShowChangelogDialog(true)}
+                title="Updates & Changelog"
+              >
                 <Bell className="w-4 h-4" />
               </Button>
 
@@ -322,6 +330,19 @@ export function Header() {
                   <Phone className="w-4 h-4 mr-2" />
                   Contact Info
                 </Button>
+
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-start lg:hidden"
+                  onClick={() => {
+                    setShowChangelogDialog(true)
+                    setShowMobileMenu(false)
+                  }}
+                >
+                  <Bell className="w-4 h-4 mr-2" />
+                  Updates
+                </Button>
               </nav>
             </div>
           )}
@@ -329,6 +350,8 @@ export function Header() {
       </header>
 
       <LoginDialog open={showLoginDialog} onOpenChange={setShowLoginDialog} />
+
+      <ChangelogDialog open={showChangelogDialog} onOpenChange={setShowChangelogDialog} />
 
       <Dialog open={showContactDialog} onOpenChange={setShowContactDialog}>
         <DialogContent className="max-w-md">

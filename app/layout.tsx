@@ -5,6 +5,7 @@ import { GeistMono } from "geist/font/mono"
 import { ThemeProvider } from "@/components/theme-provider"
 import { AuthProvider } from "@/components/auth-provider"
 import { PWAUpdatePrompt } from "@/components/pwa-update-prompt"
+import { Footer } from "@/components/footer"
 import { Analytics } from "@vercel/analytics/next"
 import Script from "next/script"
 import { Suspense } from "react"
@@ -75,11 +76,14 @@ export default function RootLayout({
         <meta name="msapplication-TileColor" content="#1e40af" />
         <meta name="msapplication-config" content="/browserconfig.xml" />
       </head>
-      <body className={`font-sans ${kantumruyPro.variable} ${GeistMono.variable} antialiased`}>
+      <body
+        className={`font-sans ${kantumruyPro.variable} ${GeistMono.variable} antialiased min-h-screen flex flex-col`}
+      >
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <AuthProvider>
             <Suspense fallback={null}>
-              {children}
+              <div className="flex-1">{children}</div>
+              <Footer />
               <PWAUpdatePrompt />
             </Suspense>
           </AuthProvider>

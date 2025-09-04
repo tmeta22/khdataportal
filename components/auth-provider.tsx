@@ -26,6 +26,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         if (typeof window === "undefined") {
           console.log("[v0] Window undefined, skipping auth check")
+          setIsLoading(false)
           return
         }
 
@@ -37,12 +38,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const authData = JSON.parse(savedAuth)
           console.log("[v0] Parsed auth data:", authData)
 
-          if (authData.isAuthenticated && authData.user) {
+          const isValidAuth =
+            authData.isAuthenticated &&
+            authData.user &&
+            authData.timestamp &&
+            Date.now() - authData.timestamp < 24 * 60 * 60 * 1000 // 24 hours
+
+          if (isValidAuth) {
             console.log("[v0] Valid auth found, restoring session for:", authData.user.username)
             setIsAuthenticated(true)
             setUser(authData.user)
           } else {
-            console.log("[v0] Invalid auth data structure")
+            console.log("[v0] Auth expired or invalid, clearing data")
+            localStorage.removeItem("cambodia-admin-auth")
           }
         } else {
           console.log("[v0] No saved auth data found")
@@ -58,7 +66,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    checkAuth()
+    const timer = setTimeout(checkAuth, 100)
+    return () => clearTimeout(timer)
   }, [])
 
   const login = (username: string, password: string): boolean => {
