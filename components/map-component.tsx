@@ -23,6 +23,8 @@ interface MapComponentProps {
   showDistrictBoundaries?: boolean
   showCommuneBoundaries?: boolean
   mapType?: "osm" | "google" | "satellite" | "hybrid"
+  showKhanMarkers?: boolean
+  showSangkatMarkers?: boolean
 }
 
 const fallbackProvinces = [
@@ -203,6 +205,8 @@ export default function MapComponent({
   showDistrictBoundaries = false,
   showCommuneBoundaries = false,
   mapType = "osm",
+  showKhanMarkers = false,
+  showSangkatMarkers = false,
 }: MapComponentProps) {
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<any>(null)
@@ -246,8 +250,6 @@ export default function MapComponent({
 
   useEffect(() => {
     async function loadDistricts() {
-      if (!showDistrictMarkers) return
-
       try {
         const [districtsResult, khanResult] = await Promise.all([
           supabase
@@ -285,12 +287,10 @@ export default function MapComponent({
     }
 
     loadDistricts()
-  }, [supabase, showDistrictMarkers])
+  }, [supabase]) // Remove showDistrictMarkers dependency to always load data
 
   useEffect(() => {
     async function loadCommunes() {
-      if (!showCommuneMarkers) return
-
       try {
         const [communesResult, sangkatResult] = await Promise.all([
           supabase
@@ -328,7 +328,7 @@ export default function MapComponent({
     }
 
     loadCommunes()
-  }, [supabase, showCommuneMarkers])
+  }, [supabase]) // Remove showCommuneMarkers dependency to always load data
 
   useEffect(() => {
     async function loadVillages() {
@@ -892,10 +892,16 @@ export default function MapComponent({
       if (showProvinceMarkers && provinces.length > 0) {
         addProvinceMarkers()
       }
-      if (showDistrictMarkers && (districts.length > 0 || khan.length > 0)) {
+      if (showKhanMarkers && khan.length > 0) {
         addDistrictMarkers()
       }
-      if (showCommuneMarkers && (communes.length > 0 || sangkat.length > 0)) {
+      if (showDistrictMarkers && districts.length > 0) {
+        addDistrictMarkers()
+      }
+      if (showSangkatMarkers && sangkat.length > 0) {
+        addCommuneMarkers()
+      }
+      if (showCommuneMarkers && communes.length > 0) {
         addCommuneMarkers()
       }
       if (showVillageMarkers && villages.length > 0) {
@@ -952,7 +958,9 @@ export default function MapComponent({
     sangkat,
     showProvinceMarkers,
     showDistrictMarkers,
+    showKhanMarkers, // Add showKhanMarkers dependency
     showCommuneMarkers,
+    showSangkatMarkers, // Add showSangkatMarkers dependency
     showVillageMarkers,
     showProvinceBoundaries,
     showDistrictBoundaries,

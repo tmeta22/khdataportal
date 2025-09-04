@@ -240,152 +240,156 @@ export function InteractiveMap({
   }, [])
 
   return (
-    <Card className={isFullscreen ? "fixed inset-4 z-40" : ""}>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center space-x-2">
-            <MapIcon className="w-5 h-5" />
-            <span>Interactive Map</span>
-            <span className="text-sm font-normal text-muted-foreground">Zoom: {zoom}</span>
-          </CardTitle>
-          <div className="flex items-center space-x-2">
-            <Button variant={mapType === "osm" ? "default" : "outline"} size="sm" onClick={() => setMapType("osm")}>
-              <MapIconLucide className="w-4 h-4 mr-1" />
-              <span className="hidden sm:inline">Map</span>
-            </Button>
-            <Button
-              variant={mapType === "satellite" || mapType === "hybrid" ? "default" : "outline"}
-              size="sm"
-              onClick={() => {
-                if (mapType === "osm") {
-                  setMapType(satelliteMode)
-                } else if (mapType === "satellite") {
-                  setSatelliteMode("hybrid")
-                  setMapType("hybrid")
-                } else if (mapType === "hybrid") {
-                  setSatelliteMode("satellite")
-                  setMapType("satellite")
-                }
-              }}
-            >
-              <Satellite className="w-4 h-4 mr-1" />
-              <span className="hidden sm:inline">{mapType === "hybrid" ? "Satellite + Labels" : "Satellite"}</span>
-              <span className="sm:hidden">{mapType === "hybrid" ? "Sat+" : "Sat"}</span>
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setLegendVisible(!legendVisible)}
-              title={legendVisible ? "Hide Legend" : "Show Legend"}
-            >
-              {legendVisible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-            </Button>
+    <div className={isFullscreen ? "fixed inset-4 z-40" : ""}>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center space-x-2">
+          <Button variant={mapType === "osm" ? "default" : "outline"} size="sm" onClick={() => setMapType("osm")}>
+            <MapIconLucide className="w-4 h-4 mr-1" />
+            <span className="hidden sm:inline">Map</span>
+          </Button>
+          <Button
+            variant={mapType === "satellite" || mapType === "hybrid" ? "default" : "outline"}
+            size="sm"
+            onClick={() => {
+              if (mapType === "osm") {
+                setMapType(satelliteMode)
+              } else if (mapType === "satellite") {
+                setSatelliteMode("hybrid")
+                setMapType("hybrid")
+              } else if (mapType === "hybrid") {
+                setSatelliteMode("satellite")
+                setMapType("satellite")
+              }
+            }}
+          >
+            <Satellite className="w-4 h-4 mr-1" />
+            <span className="hidden sm:inline">{mapType === "hybrid" ? "Satellite + Labels" : "Satellite"}</span>
+            <span className="sm:hidden">{mapType === "hybrid" ? "Sat+" : "Sat"}</span>
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setLegendVisible(!legendVisible)}
+            title={legendVisible ? "Hide Legend" : "Show Legend"}
+          >
+            {legendVisible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+          </Button>
+        </div>
+        {legendVisible && (
+          <div className="max-w-sm">
+            <EnhancedMapLegend onLayerToggle={handleLayerToggle} layerStates={layerStates} statistics={statistics} />
           </div>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className={`relative rounded-lg overflow-hidden ${isFullscreen ? "h-[calc(100vh-200px)]" : "h-96"}`}>
-          <MapComponent
-            selectedProvince={selectedProvince}
-            selectedDistrict={selectedDistrict}
-            selectedCommune={selectedCommune}
-            selectedVillage={selectedVillage}
-            onLocationSelect={onLocationSelect}
-            onZoomChange={setZoom}
-            isFullscreen={isFullscreen}
-            onFullscreenToggle={() => setIsFullscreen(!isFullscreen)}
-            showProvinceMarkers={showProvinceMarkers}
-            showDistrictMarkers={showDistrictMarkers}
-            showKhanMarkers={showKhanMarkers}
-            showCommuneMarkers={showCommuneMarkers}
-            showSangkatMarkers={showSangkatMarkers}
-            showVillageMarkers={showVillageMarkers}
-            showProvinceBoundaries={showProvinceBoundaries}
-            showDistrictBoundaries={showDistrictBoundaries}
-            showCommuneBoundaries={showCommuneBoundaries}
-            mapType={mapType}
-          />
+        )}
+      </div>
 
-          {(selectedProvinceData || selectedDistrictData || selectedCommuneData || selectedVillageData) && (
-            <div className="absolute top-4 left-4 bg-white/95 backdrop-blur-sm rounded-lg p-4 shadow-lg max-w-sm z-[1001] border">
-              <div className="flex items-center space-x-2 mb-3">
-                <MapPin className="w-4 h-4 text-blue-600" />
-                <p className="text-sm font-medium">Selected Location</p>
-              </div>
-              {selectedProvinceData && (
-                <div className="space-y-2">
-                  <p className="text-sm font-semibold text-gray-800">
-                    {selectedProvinceData.name_latin} ({selectedProvinceData.name_khmer})
-                  </p>
-                  <div className="text-xs text-gray-600 space-y-1">
-                    <p>
-                      <span className="font-medium">Population:</span>{" "}
-                      {selectedProvinceData.population?.toLocaleString() || "N/A"}
-                    </p>
-                    <p>
-                      <span className="font-medium">Area:</span> {selectedProvinceData.area?.toLocaleString() || "N/A"}{" "}
-                      km²
-                    </p>
-                    <p>
-                      <span className="font-medium">Coordinates:</span> {selectedProvinceData.latitude},{" "}
-                      {selectedProvinceData.longitude}
-                    </p>
-                    <p>
-                      <span className="font-medium">Type:</span> {selectedProvinceData.type || "Province"}
-                    </p>
-                  </div>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center space-x-2">
+              <MapIcon className="w-5 h-5" />
+              <span>Interactive Map</span>
+              <span className="text-sm font-normal text-muted-foreground">Zoom: {zoom}</span>
+            </CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className={`relative rounded-lg overflow-hidden ${isFullscreen ? "h-[calc(100vh-200px)]" : "h-96"}`}>
+            <MapComponent
+              selectedProvince={selectedProvince}
+              selectedDistrict={selectedDistrict}
+              selectedCommune={selectedCommune}
+              selectedVillage={selectedVillage}
+              onLocationSelect={onLocationSelect}
+              onZoomChange={setZoom}
+              isFullscreen={isFullscreen}
+              onFullscreenToggle={() => setIsFullscreen(!isFullscreen)}
+              showProvinceMarkers={showProvinceMarkers}
+              showDistrictMarkers={showDistrictMarkers}
+              showKhanMarkers={showKhanMarkers}
+              showCommuneMarkers={showCommuneMarkers}
+              showSangkatMarkers={showSangkatMarkers}
+              showVillageMarkers={showVillageMarkers}
+              showProvinceBoundaries={showProvinceBoundaries}
+              showDistrictBoundaries={showDistrictBoundaries}
+              showCommuneBoundaries={showCommuneBoundaries}
+              mapType={mapType}
+            />
+
+            {(selectedProvinceData || selectedDistrictData || selectedCommuneData || selectedVillageData) && (
+              <div className="absolute top-4 left-4 bg-white/95 backdrop-blur-sm rounded-lg p-4 shadow-lg max-w-sm z-[1001] border">
+                <div className="flex items-center space-x-2 mb-3">
+                  <MapPin className="w-4 h-4 text-blue-600" />
+                  <p className="text-sm font-medium">Selected Location</p>
                 </div>
-              )}
-              {selectedDistrictData && (
-                <p className="text-xs text-gray-600">
-                  <span className="font-medium">District:</span> {selectedDistrictData.name_latin} (
-                  {selectedDistrictData.name_khmer})
-                </p>
-              )}
-              {selectedCommuneData && (
-                <p className="text-xs text-gray-600">
-                  <span className="font-medium">Commune:</span> {selectedCommuneData.name_latin} (
-                  {selectedCommuneData.name_khmer})
-                </p>
-              )}
-              {selectedVillageData && (
-                <p className="text-xs text-gray-600">
-                  <span className="font-medium">Village:</span> {selectedVillageData.name_latin} (
-                  {selectedVillageData.name_khmer})
-                </p>
-              )}
-            </div>
-          )}
+                {selectedProvinceData && (
+                  <div className="space-y-2">
+                    <p className="text-sm font-semibold text-gray-800">
+                      {selectedProvinceData.name_latin} ({selectedProvinceData.name_khmer})
+                    </p>
+                    <div className="text-xs text-gray-600 space-y-1">
+                      <p>
+                        <span className="font-medium">Population:</span>{" "}
+                        {selectedProvinceData.population?.toLocaleString() || "N/A"}
+                      </p>
+                      <p>
+                        <span className="font-medium">Area:</span>{" "}
+                        {selectedProvinceData.area?.toLocaleString() || "N/A"} km²
+                      </p>
+                      <p>
+                        <span className="font-medium">Coordinates:</span> {selectedProvinceData.latitude},{" "}
+                        {selectedProvinceData.longitude}
+                      </p>
+                      <p>
+                        <span className="font-medium">Type:</span> {selectedProvinceData.type || "Province"}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                {selectedDistrictData && (
+                  <p className="text-xs text-gray-600">
+                    <span className="font-medium">District:</span> {selectedDistrictData.name_latin} (
+                    {selectedDistrictData.name_khmer})
+                  </p>
+                )}
+                {selectedCommuneData && (
+                  <p className="text-xs text-gray-600">
+                    <span className="font-medium">Commune:</span> {selectedCommuneData.name_latin} (
+                    {selectedCommuneData.name_khmer})
+                  </p>
+                )}
+                {selectedVillageData && (
+                  <p className="text-xs text-gray-600">
+                    <span className="font-medium">Village:</span> {selectedVillageData.name_latin} (
+                    {selectedVillageData.name_khmer})
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
 
-          {legendVisible && (
-            <div className="absolute top-4 right-4 z-[1001]">
-              <EnhancedMapLegend onLayerToggle={handleLayerToggle} layerStates={layerStates} statistics={statistics} />
-            </div>
-          )}
-        </div>
-
-        <div className="flex items-center justify-between mt-4 text-sm text-muted-foreground">
-          <span>Selected: {selectedRegions} regions</span>
-          <span>
-            Layers:{" "}
-            {[
-              showProvinceMarkers && "Provinces",
-              showDistrictMarkers && "Districts",
-              showKhanMarkers && "Khan",
-              showCommuneMarkers && "Communes",
-              showSangkatMarkers && "Sangkat",
-              showVillageMarkers && "Villages",
-            ]
-              .filter(Boolean)
-              .join(", ") || "None"}
-          </span>
-          {selectedRegions === 0 ? (
-            <span>Select a region to view markers</span>
-          ) : (
-            <span>Click markers for details</span>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+          <div className="flex items-center justify-between mt-4 text-sm text-muted-foreground">
+            <span>Selected: {selectedRegions} regions</span>
+            <span>
+              Layers:{" "}
+              {[
+                showProvinceMarkers && "Provinces",
+                showDistrictMarkers && "Districts",
+                showKhanMarkers && "Khan",
+                showCommuneMarkers && "Communes",
+                showSangkatMarkers && "Sangkat",
+                showVillageMarkers && "Villages",
+              ]
+                .filter(Boolean)
+                .join(", ") || "None"}
+            </span>
+            {selectedRegions === 0 ? (
+              <span>Select a region to view markers</span>
+            ) : (
+              <span>Click markers for details</span>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   )
 }
