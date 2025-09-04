@@ -90,7 +90,10 @@ export default function DetailsPage() {
 
   useEffect(() => {
     if (selectedProvince) {
-      loadCensusData(selectedProvince.name_latin)
+      const timer = setTimeout(() => {
+        loadCensusData(selectedProvince.name_latin)
+      }, 100)
+      return () => clearTimeout(timer)
     }
   }, [selectedProvince])
 
@@ -99,64 +102,58 @@ export default function DetailsPage() {
       console.log("[v0] Loading census data for province:", provinceName)
 
       let census = null
+      let attempts = 0
+      const maxAttempts = 3
 
-      // Try multiple matching strategies to find census data
-      const queries = [
-        // Exact match on provinces column
-        supabase
-          .from("census_data")
-          .select("*")
-          .eq("provinces", provinceName)
-          .maybeSingle(),
-        // Case-insensitive match on provinces column
-        supabase
-          .from("census_data")
-          .select("*")
-          .ilike("provinces", provinceName)
-          .maybeSingle(),
-        // Try with "Province" suffix
-        supabase
-          .from("census_data")
-          .select("*")
-          .ilike("provinces", `${provinceName} Province`)
-          .maybeSingle(),
-        // Try without "Province" suffix if it exists
-        supabase
-          .from("census_data")
-          .select("*")
-          .ilike("provinces", provinceName.replace(" Province", ""))
-          .maybeSingle(),
-        // Partial match for provinces with different naming
-        supabase
-          .from("census_data")
-          .select("*")
-          .or(`provinces.ilike.%${provinceName}%,provinces_kh.ilike.%${provinceName}%`)
-          .maybeSingle(),
-        // Try matching by pro_code if available
-        supabase
-          .from("census_data")
-          .select("*")
-          .eq("pro_code", selectedProvince?.code)
-          .maybeSingle(),
-      ]
+      while (!census && attempts < maxAttempts) {
+        attempts++
+        console.log(`[v0] Census data loading attempt ${attempts} for:`, provinceName)
 
-      for (const query of queries) {
-        const result = await query
-        if (result.data && !result.error) {
-          census = result.data
-          console.log("[v0] Census data found using query strategy")
-          break
+        const queries = [
+          supabase.from("census_data").select("*").eq("provinces", provinceName).maybeSingle(),
+          supabase.from("census_data").select("*").ilike("provinces", provinceName).maybeSingle(),
+          supabase.from("census_data").select("*").ilike("provinces", `${provinceName} Province`).maybeSingle(),
+          supabase
+            .from("census_data")
+            .select("*")
+            .ilike("provinces", provinceName.replace(" Province", ""))
+            .maybeSingle(),
+          supabase
+            .from("census_data")
+            .select("*")
+            .or(`provinces.ilike.%${provinceName}%,provinces_kh.ilike.%${provinceName}%`)
+            .maybeSingle(),
+          selectedProvince?.code
+            ? supabase.from("census_data").select("*").eq("pro_code", selectedProvince.code).maybeSingle()
+            : null,
+        ].filter(Boolean)
+
+        for (const query of queries) {
+          try {
+            const result = await query
+            if (result.data && !result.error) {
+              census = result.data
+              console.log("[v0] Census data found using query strategy on attempt", attempts)
+              break
+            }
+          } catch (queryError) {
+            console.warn("[v0] Query failed:", queryError)
+          }
+        }
+
+        if (!census && attempts < maxAttempts) {
+          await new Promise((resolve) => setTimeout(resolve, 500))
         }
       }
 
       if (census) {
-        console.log("[v0] Census data loaded:", census)
+        console.log("[v0] Census data loaded successfully:", census)
         setCensusData(census)
       } else {
-        console.log("[v0] No census data found for:", provinceName)
-        const { data: allCensus } = await supabase.from("census_data").select("provinces, pro_code")
+        console.log("[v0] No census data found after", attempts, "attempts for:", provinceName)
+        const { data: allCensus } = await supabase.from("census_data").select("provinces, pro_code").limit(5)
         console.log(
-          "[v0] Available census provinces:",
+          "[v0] Sample available census provinces:",
           allCensus?.map((c) => c.provinces),
         )
         setCensusData(null)
@@ -181,40 +178,66 @@ export default function DetailsPage() {
       } else {
         const transformedProvinces: Province[] = await Promise.all(
           provincesData.map(async (p) => {
+            let totalSubdivisions = 0
+
             const { count: districtsCount } = await supabase
               .from("districts")
               .select("*", { count: "exact", head: true })
               .eq("province_id", p.id)
 
+            totalSubdivisions += districtsCount || 0
+
+            if (p.name_latin === "Phnom Penh Capital" || p.code === "12") {
+              const { count: khanCount } = await supabase.from("khan").select("*", { count: "exact", head: true })
+              totalSubdivisions += khanCount || 0
+              console.log(`[v0] Khan count for ${p.name_latin}:`, khanCount)
+            }
+
             const { data: districtIds } = await supabase.from("districts").select("id").eq("province_id", p.id)
+            const districtIdList = districtIds?.map((d) => d.id) || []
 
             let communesCount = 0
-            if (districtIds && districtIds.length > 0) {
+            if (districtIdList.length > 0) {
               const { count } = await supabase
                 .from("communes")
                 .select("*", { count: "exact", head: true })
-                .in(
-                  "district_id",
-                  districtIds.map((d) => d.id),
-                )
+                .in("district_id", districtIdList)
               communesCount = count || 0
             }
+            totalSubdivisions += communesCount
 
-            const { data: communeIds } = await supabase
-              .from("communes")
-              .select("id")
-              .in("district_id", districtIds?.map((d) => d.id) || [])
+            if (p.name_latin === "Phnom Penh Capital" || p.code === "12") {
+              const { count: sangkatCount } = await supabase.from("sangkat").select("*", { count: "exact", head: true })
+              totalSubdivisions += sangkatCount || 0
+              console.log(`[v0] Sangkat count for ${p.name_latin}:`, sangkatCount)
+            }
+
+            const { data: communeIds } = await supabase.from("communes").select("id").in("district_id", districtIdList)
+
+            const { data: sangkatIds } =
+              p.name_latin === "Phnom Penh Capital" || p.code === "12"
+                ? await supabase.from("sangkat").select("id")
+                : { data: [] }
+
+            const allCommuneIds = [...(communeIds?.map((c) => c.id) || []), ...(sangkatIds?.map((s) => s.id) || [])]
 
             let villagesCount = 0
-            if (communeIds && communeIds.length > 0) {
+            if (allCommuneIds.length > 0) {
               const { count } = await supabase
                 .from("villages")
                 .select("*", { count: "exact", head: true })
-                .in(
-                  "commune_id",
-                  communeIds.map((c) => c.id),
-                )
+                .in("commune_id", allCommuneIds)
               villagesCount = count || 0
+            }
+            totalSubdivisions += villagesCount
+
+            if (p.name_latin === "Phnom Penh Capital") {
+              console.log(`[v0] Total subdivisions for ${p.name_latin}:`, {
+                districts: districtsCount,
+                communes: communesCount,
+                villages: villagesCount,
+                total: totalSubdivisions,
+              })
             }
 
             return {
@@ -224,7 +247,7 @@ export default function DetailsPage() {
               name_khmer: p.name_khmer,
               population: p.population || 0,
               area: p.area || 0,
-              subdivisions: (districtsCount || 0) + (communesCount || 0) + (villagesCount || 0),
+              subdivisions: totalSubdivisions,
               latitude: p.latitude || 0,
               longitude: p.longitude || 0,
               elevation: p.elevation || 0,
@@ -347,7 +370,6 @@ export default function DetailsPage() {
         </Button>
       </div>
 
-      {/* Province Selector */}
       <div className="mb-6">
         <Label htmlFor="province-select" className="text-sm font-medium mb-2 block">
           Select Province
@@ -377,7 +399,6 @@ export default function DetailsPage() {
 
       {selectedProvince && (
         <>
-          {/* Breadcrumb */}
           <nav className="flex items-center space-x-2 text-sm text-muted-foreground mb-6">
             <span>Cambodia</span>
             <span>→</span>
@@ -385,7 +406,6 @@ export default function DetailsPage() {
             <span className="text-foreground font-medium">{selectedProvince.name_latin}</span>
           </nav>
 
-          {/* Header */}
           <div className="flex items-start justify-between mb-6">
             <div>
               <div className="flex items-center gap-3 mb-2">
@@ -416,7 +436,6 @@ export default function DetailsPage() {
             </div>
           </div>
 
-          {/* Stats Overview */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
             <Card className="p-6">
               <div className="flex items-center gap-3">
@@ -457,7 +476,6 @@ export default function DetailsPage() {
             </Card>
           </div>
 
-          {/* Main Content */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2">
               <Tabs defaultValue="overview" className="w-full">
@@ -703,7 +721,6 @@ export default function DetailsPage() {
               </Tabs>
             </div>
 
-            {/* Sidebar */}
             <div className="space-y-6">
               <Card className="p-4">
                 <h3 className="font-semibold mb-4">Quick Actions</h3>
@@ -738,7 +755,6 @@ export default function DetailsPage() {
         </>
       )}
 
-      {/* Edit Dialog */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>

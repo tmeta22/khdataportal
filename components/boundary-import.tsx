@@ -113,8 +113,7 @@ export function BoundaryImport({ onImportComplete }: BoundaryImportProps) {
           // Extract identifying information from properties
           const properties = feature.properties || {}
 
-          // Try to extract code
-          const codeFields = ["ADM2_PCODE", "ADM1_PCODE", "ADM3_PCODE", "code", "CODE", "PCODE", "id", "ID"]
+          const codeFields = ["ADM2_PCODE", "ADM1_PCODE", "ADM3_PCODE", "code", "CODE", "PCODE", "id", "ID", "FID"]
           let code = null
           for (const field of codeFields) {
             if (properties[field] !== undefined && properties[field] !== null && properties[field] !== "") {
@@ -123,7 +122,6 @@ export function BoundaryImport({ onImportComplete }: BoundaryImportProps) {
             }
           }
 
-          // Try to extract name
           const nameFields = [
             "ADM2_EN",
             "ADM1_EN",
@@ -134,6 +132,13 @@ export function BoundaryImport({ onImportComplete }: BoundaryImportProps) {
             "DISTRICT",
             "PROVINCE",
             "COMMUNE",
+            "VILLAGE",
+            "SANGKAT",
+            "KHAN",
+            "ADM2_KH",
+            "ADM1_KH",
+            "ADM3_KH",
+            "NAME_KH",
           ]
           let name = null
           for (const field of nameFields) {
@@ -144,7 +149,7 @@ export function BoundaryImport({ onImportComplete }: BoundaryImportProps) {
           }
 
           // Create a unique identifier for this boundary
-          const boundaryId = code || name || `feature_${i + 1}`
+          const boundaryId = code || name || `${boundaryType}_feature_${i + 1}`
 
           if (!boundaryId) {
             errors++
@@ -152,18 +157,14 @@ export function BoundaryImport({ onImportComplete }: BoundaryImportProps) {
             continue
           }
 
-          console.log(`[v0] Processing boundary: ${boundaryId} (${name || "unnamed"})`)
+          console.log(`[v0] Processing boundary: ${boundaryId} (${name || "unnamed"}) - Type: ${boundaryType}`)
 
-          // Use a generic boundaries table for map display
-          const boundaryTable = "map_boundaries"
-
-          // Check if this boundary already exists
           const { data: existing } = await supabase
-            .from(boundaryTable)
+            .from("map_boundaries")
             .select("id")
             .eq("boundary_id", boundaryId)
             .eq("boundary_type", boundaryType)
-            .single()
+            .maybeSingle()
 
           if (existing) {
             skipped++
@@ -171,27 +172,30 @@ export function BoundaryImport({ onImportComplete }: BoundaryImportProps) {
             continue
           }
 
-          // Insert boundary for map display
-          const { error: insertError } = await supabase.from(boundaryTable).insert({
+          const insertData = {
             boundary_id: boundaryId,
             boundary_type: boundaryType,
             name: name || boundaryId,
             code: code,
             geojson: feature.geometry,
             properties: properties,
-          })
+          }
+
+          const { error: insertError } = await supabase.from("map_boundaries").insert(insertData)
 
           if (insertError) {
             errors++
-            errorDetails.push(`Feature ${i + 1}: Database error - ${insertError.message}`)
+            const errorMsg = `Feature ${i + 1} (${boundaryId}): ${insertError.message}`
+            errorDetails.push(errorMsg)
             console.error("[v0] Insert error:", insertError)
           } else {
             imported++
-            console.log(`[v0] Imported boundary for map display: ${boundaryId}`)
+            console.log(`[v0] Successfully imported boundary: ${boundaryId}`)
           }
         } catch (featureError) {
           errors++
-          errorDetails.push(`Feature ${i + 1}: Processing error - ${featureError}`)
+          const errorMsg = `Feature ${i + 1}: Processing error - ${featureError}`
+          errorDetails.push(errorMsg)
           console.error("[v0] Feature processing error:", featureError)
         }
 
