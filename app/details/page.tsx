@@ -59,18 +59,36 @@ interface Province {
   note_by_checker: string
 }
 
+interface CensusData {
+  id: string
+  pro_code: string
+  provinces_kh: string
+  provinces: string
+  households: number
+  males: number
+  females: number
+  total: number
+  household_size: number
+  area_km2: number
+  pop_km2: number
+  year: number
+}
+
 export default function DetailsPage() {
   const [provinces, setProvinces] = useState<Province[]>([])
   const [selectedProvince, setSelectedProvince] = useState<Province | null>(null)
   const [loading, setLoading] = useState(true)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
   const [editForm, setEditForm] = useState<Partial<Province>>({})
+  const [censusData, setCensusData] = useState<CensusData[]>([])
+  const [selectedCensusData, setSelectedCensusData] = useState<CensusData | null>(null)
   const { isAuthenticated } = useAuth()
   const supabase = createClient()
   const router = useRouter()
 
   useEffect(() => {
     loadProvinces()
+    loadCensusData()
   }, [])
 
   const loadProvinces = async () => {
@@ -155,6 +173,23 @@ export default function DetailsPage() {
     }
   }
 
+  const loadCensusData = async () => {
+    try {
+      console.log("[v0] Loading census data for details page...")
+
+      const { data: censusResult, error } = await supabase.from("census_data").select("*").order("provinces")
+
+      if (error) {
+        console.error("[v0] Error loading census data:", error)
+      } else {
+        setCensusData(censusResult || [])
+        console.log("[v0] Census data loaded for details page:", censusResult?.length || 0, "records")
+      }
+    } catch (error) {
+      console.error("[v0] Error loading census data:", error)
+    }
+  }
+
   const handleEdit = (province: Province) => {
     setEditForm(province)
     setEditDialogOpen(true)
@@ -221,6 +256,18 @@ export default function DetailsPage() {
     }
   }
 
+  const handleProvinceChange = (value: string) => {
+    const province = provinces.find((p) => p.id === value)
+    setSelectedProvince(province || null)
+
+    if (province) {
+      const matchingCensus = censusData.find(
+        (c) => c.provinces.toLowerCase() === province.name_latin.toLowerCase() || c.pro_code === province.code,
+      )
+      setSelectedCensusData(matchingCensus || null)
+    }
+  }
+
   if (loading) {
     return (
       <div className="container mx-auto px-4 py-6">
@@ -247,18 +294,11 @@ export default function DetailsPage() {
         </Button>
       </div>
 
-      {/* Province Selector */}
       <div className="mb-6">
         <Label htmlFor="province-select" className="text-sm font-medium mb-2 block">
           Select Province
         </Label>
-        <Select
-          value={selectedProvince?.id || ""}
-          onValueChange={(value) => {
-            const province = provinces.find((p) => p.id === value)
-            setSelectedProvince(province || null)
-          }}
-        >
+        <Select value={selectedProvince?.id || ""} onValueChange={handleProvinceChange}>
           <SelectTrigger className="w-full max-w-md">
             <SelectValue placeholder="Choose a province..." />
           </SelectTrigger>
@@ -277,7 +317,6 @@ export default function DetailsPage() {
 
       {selectedProvince && (
         <>
-          {/* Breadcrumb */}
           <nav className="flex items-center space-x-2 text-sm text-muted-foreground mb-6">
             <span>Cambodia</span>
             <span>→</span>
@@ -285,7 +324,6 @@ export default function DetailsPage() {
             <span className="text-foreground font-medium">{selectedProvince.name_latin}</span>
           </nav>
 
-          {/* Header */}
           <div className="flex items-start justify-between mb-6">
             <div>
               <div className="flex items-center gap-3 mb-2">
@@ -316,7 +354,6 @@ export default function DetailsPage() {
             </div>
           </div>
 
-          {/* Stats Overview */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
             <Card className="p-6">
               <div className="flex items-center gap-3">
@@ -349,7 +386,6 @@ export default function DetailsPage() {
             </Card>
           </div>
 
-          {/* Main Content */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2">
               <Tabs defaultValue="overview" className="w-full">
@@ -474,25 +510,57 @@ export default function DetailsPage() {
                       <div className="space-y-3">
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Population</span>
-                          <span className="font-medium">{selectedProvince.population.toLocaleString()}</span>
+                          <span className="font-medium">
+                            {selectedCensusData?.total?.toLocaleString() ||
+                              selectedProvince.population.toLocaleString()}
+                          </span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Population Density</span>
                           <span className="font-medium">
-                            {selectedProvince.area > 0
-                              ? Math.round(selectedProvince.population / selectedProvince.area)
-                              : 0}
+                            {selectedCensusData?.pop_km2?.toFixed(1) ||
+                              (selectedProvince.area > 0
+                                ? Math.round(selectedProvince.population / selectedProvince.area)
+                                : 0)}
                             /km²
                           </span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Households</span>
                           <span className="font-medium">
-                            {Math.round(selectedProvince.population / 4).toLocaleString()}
+                            {selectedCensusData?.households?.toLocaleString() ||
+                              Math.round(selectedProvince.population / 4).toLocaleString()}
                           </span>
                         </div>
+                        {selectedCensusData && (
+                          <>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Males</span>
+                              <span className="font-medium">{selectedCensusData.males.toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Females</span>
+                              <span className="font-medium">{selectedCensusData.females.toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Household Size</span>
+                              <span className="font-medium">{selectedCensusData.household_size.toFixed(1)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Census Year</span>
+                              <span className="font-medium">{selectedCensusData.year}</span>
+                            </div>
+                          </>
+                        )}
                       </div>
                       <div className="space-y-3">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Area</span>
+                          <span className="font-medium">
+                            {selectedCensusData?.area_km2?.toLocaleString() || selectedProvince.area.toLocaleString()}{" "}
+                            km²
+                          </span>
+                        </div>
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Sub-divisions</span>
                           <span className="font-medium">{selectedProvince.subdivisions}</span>
@@ -532,7 +600,6 @@ export default function DetailsPage() {
               </Tabs>
             </div>
 
-            {/* Sidebar */}
             <div className="space-y-6">
               <Card className="p-4">
                 <h3 className="font-semibold mb-4">Quick Actions</h3>
@@ -559,7 +626,6 @@ export default function DetailsPage() {
                 </div>
               </Card>
 
-              {/* Recent Updates */}
               <Card className="p-4">
                 <h3 className="font-semibold mb-4">Recent Updates</h3>
                 <RecentUpdates />
@@ -569,7 +635,6 @@ export default function DetailsPage() {
         </>
       )}
 
-      {/* Edit Dialog */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>

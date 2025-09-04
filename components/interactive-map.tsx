@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { MapIcon } from "lucide-react"
 import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
-import SimpleMap from "./simple-map"
+import LeafletMap from "./leaflet-map"
 import { EnhancedMapLegend } from "./enhanced-map-legend"
 
 interface InteractiveMapProps {
@@ -174,7 +174,7 @@ export function InteractiveMap({
           </CardHeader>
           <CardContent>
             <div className={`relative rounded-lg overflow-hidden ${isFullscreen ? "h-[calc(100vh-200px)]" : "h-96"}`}>
-              <SimpleMap
+              <LeafletMap
                 provinces={provinces}
                 districts={districts}
                 communes={communes}
