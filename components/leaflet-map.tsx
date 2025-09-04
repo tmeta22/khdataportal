@@ -86,6 +86,11 @@ export default function LeafletMap({
         center: [12.5657, 104.991],
         zoom: 7,
         zoomControl: false,
+        maxBounds: [
+          [9.0, 102.0], // Southwest coordinates
+          [15.0, 108.0], // Northeast coordinates
+        ],
+        maxBoundsViscosity: 1.0,
       })
 
       // Define tile layers
@@ -264,7 +269,6 @@ export default function LeafletMap({
   return (
     <div className="relative w-full h-full">
       <div ref={mapRef} className="w-full h-full rounded-lg" />
-
       {/* Map Controls */}
       <div className="absolute top-4 right-4 flex flex-col gap-2">
         {/* Tile Layer Controls */}

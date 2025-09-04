@@ -110,9 +110,17 @@ export default function DetailsPage() {
               .select("*", { count: "exact", head: true })
               .eq("province_id", p.id)
 
+            const { count: khanCount } = await supabase
+              .from("khan")
+              .select("*", { count: "exact", head: true })
+              .eq("province_id", p.id)
+
             const { data: districtIds } = await supabase.from("districts").select("id").eq("province_id", p.id)
+            const { data: khanIds } = await supabase.from("khan").select("id").eq("province_id", p.id)
 
             let communesCount = 0
+            let sangkatCount = 0
+
             if (districtIds && districtIds.length > 0) {
               const { count } = await supabase
                 .from("communes")
@@ -124,12 +132,29 @@ export default function DetailsPage() {
               communesCount = count || 0
             }
 
+            if (khanIds && khanIds.length > 0) {
+              const { count } = await supabase
+                .from("sangkat")
+                .select("*", { count: "exact", head: true })
+                .in(
+                  "khan_id",
+                  khanIds.map((k) => k.id),
+                )
+              sangkatCount = count || 0
+            }
+
             const { data: communeIds } = await supabase
               .from("communes")
               .select("id")
               .in("district_id", districtIds?.map((d) => d.id) || [])
 
+            const { data: sangkatIds } = await supabase
+              .from("sangkat")
+              .select("id")
+              .in("khan_id", khanIds?.map((k) => k.id) || [])
+
             let villagesCount = 0
+
             if (communeIds && communeIds.length > 0) {
               const { count } = await supabase
                 .from("villages")
@@ -138,7 +163,18 @@ export default function DetailsPage() {
                   "commune_id",
                   communeIds.map((c) => c.id),
                 )
-              villagesCount = count || 0
+              villagesCount += count || 0
+            }
+
+            if (sangkatIds && sangkatIds.length > 0) {
+              const { count } = await supabase
+                .from("villages")
+                .select("*", { count: "exact", head: true })
+                .in(
+                  "sangkat_id",
+                  sangkatIds.map((s) => s.id),
+                )
+              villagesCount += count || 0
             }
 
             return {
@@ -148,7 +184,12 @@ export default function DetailsPage() {
               name_khmer: p.name_khmer,
               population: p.population || 0,
               area: p.area || 0,
-              subdivisions: (districtsCount || 0) + (communesCount || 0) + (villagesCount || 0),
+              subdivisions:
+                (districtsCount || 0) +
+                (khanCount || 0) +
+                (communesCount || 0) +
+                (sangkatCount || 0) +
+                (villagesCount || 0),
               latitude: p.latitude || 0,
               longitude: p.longitude || 0,
               elevation: p.elevation || 0,

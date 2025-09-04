@@ -1,7 +1,8 @@
 "use client"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { MapIcon } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { MapIcon, Map, Satellite, Eye } from "lucide-react"
 import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import LeafletMap from "./leaflet-map"
@@ -25,6 +26,7 @@ export function InteractiveMap({
   const [zoom, setZoom] = useState(1)
   const [selectedRegions, setSelectedRegions] = useState(0)
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [currentTileLayer, setCurrentTileLayer] = useState("osm")
   const [provinces, setProvinces] = useState<any[]>([])
   const [districts, setDistricts] = useState<any[]>([])
   const [communes, setCommunesData] = useState<any[]>([])
@@ -167,7 +169,39 @@ export function InteractiveMap({
         <EnhancedMapLegend onLayerToggle={handleLayerToggle} layerStates={layerStates} statistics={statistics} />
       </div>
 
-      <div className="lg:col-span-3">
+      <div className="lg:col-span-3 space-y-4">
+        <div className="flex justify-end">
+          <div className="flex gap-1 bg-white rounded-lg shadow-lg p-1 border">
+            <Button
+              variant={currentTileLayer === "osm" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setCurrentTileLayer("osm")}
+              className="text-xs"
+            >
+              <Map className="w-4 h-4 mr-1" />
+              Map
+            </Button>
+            <Button
+              variant={currentTileLayer === "satellite" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setCurrentTileLayer("satellite")}
+              className="text-xs"
+            >
+              <Satellite className="w-4 h-4 mr-1" />
+              Satellite
+            </Button>
+            <Button
+              variant={currentTileLayer === "hybrid" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setCurrentTileLayer("hybrid")}
+              className="text-xs"
+            >
+              <Eye className="w-4 h-4 mr-1" />
+              Satellite + Labels
+            </Button>
+          </div>
+        </div>
+
         <Card className={isFullscreen ? "fixed inset-4 z-40" : ""}>
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -194,6 +228,7 @@ export function InteractiveMap({
                 onZoomChange={setZoom}
                 isFullscreen={isFullscreen}
                 onFullscreenToggle={() => setIsFullscreen(!isFullscreen)}
+                currentTileLayer={currentTileLayer}
               />
             </div>
 
