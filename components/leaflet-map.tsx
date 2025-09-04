@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { ZoomIn, ZoomOut, Maximize2 } from "lucide-react"
+import { createClient } from "@/lib/supabase/client"
 
 interface LeafletMapProps {
   provinces: any[]
@@ -43,6 +44,7 @@ export default function LeafletMap({
   const boundaryLayersRef = useRef<any[]>([])
   const [leafletLoaded, setLeafletLoaded] = useState(false)
   const [L, setL] = useState<any>(null)
+  const supabase = createClient()
 
   useEffect(() => {
     const loadLeaflet = async () => {
@@ -161,12 +163,20 @@ export default function LeafletMap({
             fillOpacity: 0.8,
           })
 
+          const deleteButton = `
+            <button onclick="window.deletePin('${type}', '${item.id}')" 
+                    style="background: #ef4444; color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 12px; margin-top: 8px; cursor: pointer;">
+              Delete Pin
+            </button>
+          `
+
           marker.bindPopup(`
             <div class="p-2">
               <h3 class="font-semibold">${item.name_latin || item.name}</h3>
               <p class="text-sm text-gray-600">${type.charAt(0).toUpperCase() + type.slice(1)}</p>
               <p class="text-xs">Code: ${item.code}</p>
               ${item.population ? `<p class="text-xs">Population: ${item.population.toLocaleString()}</p>` : ""}
+              ${deleteButton}
             </div>
           `)
 
@@ -186,12 +196,11 @@ export default function LeafletMap({
       })
     }
 
-    // Add markers for each administrative level
     addMarkers(provinces, "#3b82f6", "provinces", layerStates.provinces)
     addMarkers(districts, "#f97316", "districts", layerStates.districts)
-    addMarkers(khan, "#f97316", "khan", layerStates.khan)
+    addMarkers(khan, "#f59e0b", "khan", layerStates.khan) // Amber color for Khan
     addMarkers(communes, "#22c55e", "communes", layerStates.communes)
-    addMarkers(sangkat, "#22c55e", "sangkat", layerStates.sangkat)
+    addMarkers(sangkat, "#10b981", "sangkat", layerStates.sangkat) // Emerald color for Sangkat
     addMarkers(villages, "#a855f7", "villages", layerStates.villages)
   }, [provinces, districts, communes, villages, khan, sangkat, layerStates, onLocationSelect, L])
 
@@ -204,41 +213,40 @@ export default function LeafletMap({
     boundaryLayersRef.current.forEach((layer) => map.removeLayer(layer))
     boundaryLayersRef.current = []
 
-    boundaries.forEach((boundary) => {
-      if (boundary.geojson_data) {
-        try {
-          const geoJsonLayer = L.geoJSON(boundary.geojson_data, {
-            style: {
-              color: "#3b82f6",
-              weight: 2,
-              opacity: 0.8,
-              fillColor: "#3b82f6",
-              fillOpacity: 0.1,
-            },
-            onEachFeature: (feature: any, layer: any) => {
-              if (feature.properties) {
-                const props = feature.properties
-                layer.bindPopup(`
-                  <div class="p-2">
-                    <h3 class="font-semibold">${props.ADM1_EN || props.NAME_1 || "Province Boundary"}</h3>
-                    <p class="text-sm text-gray-600">Administrative Boundary</p>
-                    ${props.ADM1_PCODE ? `<p class="text-xs">Code: ${props.ADM1_PCODE}</p>` : ""}
-                  </div>
-                `)
-              }
-            },
-          })
+    if (layerStates.provinceBoundaries) {
+      boundaries.forEach((boundary) => {
+        if (boundary.geojson_data) {
+          try {
+            const geoJsonLayer = L.geoJSON(boundary.geojson_data, {
+              style: {
+                color: "#3b82f6",
+                weight: 2,
+                opacity: 0.8,
+                fillColor: "#3b82f6",
+                fillOpacity: 0.1,
+              },
+              onEachFeature: (feature: any, layer: any) => {
+                if (feature.properties) {
+                  const props = feature.properties
+                  layer.bindPopup(`
+                    <div class="p-2">
+                      <h3 class="font-semibold">${props.ADM1_EN || props.NAME_1 || "Province Boundary"}</h3>
+                      <p class="text-sm text-gray-600">Administrative Boundary</p>
+                      ${props.ADM1_PCODE ? `<p class="text-xs">Code: ${props.ADM1_PCODE}</p>` : ""}
+                    </div>
+                  `)
+                }
+              },
+            })
 
-          if (layerStates.provinceBoundaries) {
             geoJsonLayer.addTo(map)
+            boundaryLayersRef.current.push(geoJsonLayer)
+          } catch (error) {
+            console.error("[v0] Error adding boundary layer:", error)
           }
-
-          boundaryLayersRef.current.push(geoJsonLayer)
-        } catch (error) {
-          console.error("[v0] Error adding boundary layer:", error)
         }
-      }
-    })
+      })
+    }
   }, [boundaries, layerStates.provinceBoundaries, L])
 
   useEffect(() => {
@@ -256,6 +264,22 @@ export default function LeafletMap({
       tileLayers[currentTileLayer].addTo(map)
     }
   }, [currentTileLayer])
+
+  useEffect(() => {
+    window.deletePin = async (type: string, id: string) => {
+      try {
+        const tableName = type === "khan" ? "khan" : type === "sangkat" ? "sangkat" : type
+        await supabase.from(tableName).update({ latitude: null, longitude: null }).eq("id", id)
+
+        // Refresh the data
+        if (onLocationSelect) {
+          window.location.reload()
+        }
+      } catch (error) {
+        console.error("[v0] Error deleting pin:", error)
+      }
+    }
+  }, [onLocationSelect, supabase])
 
   const handleZoom = (direction: "in" | "out") => {
     if (!mapInstanceRef.current?.map) return

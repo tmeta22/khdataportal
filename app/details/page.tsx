@@ -105,21 +105,17 @@ export default function DetailsPage() {
       } else {
         const transformedProvinces: Province[] = await Promise.all(
           provincesData.map(async (p) => {
-            const { count: districtsCount } = await supabase
-              .from("districts")
-              .select("*", { count: "exact", head: true })
-              .eq("province_id", p.id)
-
-            const { count: khanCount } = await supabase
-              .from("khan")
-              .select("*", { count: "exact", head: true })
-              .eq("province_id", p.id)
-
-            const { data: districtIds } = await supabase.from("districts").select("id").eq("province_id", p.id)
-            const { data: khanIds } = await supabase.from("khan").select("id").eq("province_id", p.id)
+            const [{ count: districtsCount }, { count: khanCount }, { data: districtIds }, { data: khanIds }] =
+              await Promise.all([
+                supabase.from("districts").select("*", { count: "exact", head: true }).eq("province_id", p.id),
+                supabase.from("khan").select("*", { count: "exact", head: true }).eq("province_id", p.id),
+                supabase.from("districts").select("id").eq("province_id", p.id),
+                supabase.from("khan").select("id").eq("province_id", p.id),
+              ])
 
             let communesCount = 0
             let sangkatCount = 0
+            let villagesCount = 0
 
             if (districtIds && districtIds.length > 0) {
               const { count } = await supabase
@@ -130,6 +126,25 @@ export default function DetailsPage() {
                   districtIds.map((d) => d.id),
                 )
               communesCount = count || 0
+
+              const { data: communeIds } = await supabase
+                .from("communes")
+                .select("id")
+                .in(
+                  "district_id",
+                  districtIds.map((d) => d.id),
+                )
+
+              if (communeIds && communeIds.length > 0) {
+                const { count: villageCount } = await supabase
+                  .from("villages")
+                  .select("*", { count: "exact", head: true })
+                  .in(
+                    "commune_id",
+                    communeIds.map((c) => c.id),
+                  )
+                villagesCount += villageCount || 0
+              }
             }
 
             if (khanIds && khanIds.length > 0) {
@@ -141,40 +156,25 @@ export default function DetailsPage() {
                   khanIds.map((k) => k.id),
                 )
               sangkatCount = count || 0
-            }
 
-            const { data: communeIds } = await supabase
-              .from("communes")
-              .select("id")
-              .in("district_id", districtIds?.map((d) => d.id) || [])
-
-            const { data: sangkatIds } = await supabase
-              .from("sangkat")
-              .select("id")
-              .in("khan_id", khanIds?.map((k) => k.id) || [])
-
-            let villagesCount = 0
-
-            if (communeIds && communeIds.length > 0) {
-              const { count } = await supabase
-                .from("villages")
-                .select("*", { count: "exact", head: true })
+              const { data: sangkatIds } = await supabase
+                .from("sangkat")
+                .select("id")
                 .in(
-                  "commune_id",
-                  communeIds.map((c) => c.id),
+                  "khan_id",
+                  khanIds.map((k) => k.id),
                 )
-              villagesCount += count || 0
-            }
 
-            if (sangkatIds && sangkatIds.length > 0) {
-              const { count } = await supabase
-                .from("villages")
-                .select("*", { count: "exact", head: true })
-                .in(
-                  "sangkat_id",
-                  sangkatIds.map((s) => s.id),
-                )
-              villagesCount += count || 0
+              if (sangkatIds && sangkatIds.length > 0) {
+                const { count: villageCount } = await supabase
+                  .from("villages")
+                  .select("*", { count: "exact", head: true })
+                  .in(
+                    "sangkat_id",
+                    sangkatIds.map((s) => s.id),
+                  )
+                villagesCount += villageCount || 0
+              }
             }
 
             return {
