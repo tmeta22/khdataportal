@@ -78,7 +78,7 @@ export default function HomePage() {
       const { data: census, error } = await supabase
         .from("census_data")
         .select("*")
-        .order("population", { ascending: false })
+        .order("total", { ascending: false })
 
       if (error) {
         console.error("[v0] Error loading census data:", error)
