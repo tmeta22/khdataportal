@@ -153,6 +153,8 @@ export default function DataPage() {
   })
   const [loadingCounts, setLoadingCounts] = useState(true)
   const [isClient, setIsClient] = useState(false)
+  const [censusData, setCensusData] = useState<any[]>([])
+  const [loadingCensus, setLoadingCensus] = useState(false)
 
   const supabase = createClient()
 
@@ -165,24 +167,30 @@ export default function DataPage() {
       setLoadingCounts(true)
       console.log("[v0] Loading summary counts...")
 
-      const [provincesResult, districtsResult, communesResult, villagesResult] = await Promise.all([
-        supabase.from("provinces").select("id", { count: "exact", head: true }),
-        supabase.from("districts").select("id", { count: "exact", head: true }),
-        supabase.from("communes").select("id", { count: "exact", head: true }),
-        supabase.from("villages").select("id", { count: "exact", head: true }),
-      ])
+      const [provincesResult, districtsResult, khanResult, communesResult, sangkatResult, villagesResult] =
+        await Promise.all([
+          supabase.from("provinces").select("id", { count: "exact", head: true }),
+          supabase.from("districts").select("id", { count: "exact", head: true }),
+          supabase.from("khan").select("id", { count: "exact", head: true }),
+          supabase.from("communes").select("id", { count: "exact", head: true }),
+          supabase.from("sangkat").select("id", { count: "exact", head: true }),
+          supabase.from("villages").select("id", { count: "exact", head: true }),
+        ])
+
+      const totalDistricts = (districtsResult.count || 0) + (khanResult.count || 0)
+      const totalCommunes = (communesResult.count || 0) + (sangkatResult.count || 0)
 
       setSummaryCounts({
         provinces: provincesResult.count || 0,
-        districts: districtsResult.count || 0,
-        communes: communesResult.count || 0,
+        districts: totalDistricts,
+        communes: totalCommunes,
         villages: villagesResult.count || 0,
       })
 
       console.log("[v0] Summary counts loaded:", {
         provinces: provincesResult.count,
-        districts: districtsResult.count,
-        communes: communesResult.count,
+        districts: totalDistricts,
+        communes: totalCommunes,
         villages: villagesResult.count,
       })
     } catch (error) {
@@ -192,8 +200,29 @@ export default function DataPage() {
     }
   }
 
+  const loadCensusData = async () => {
+    try {
+      setLoadingCensus(true)
+      console.log("[v0] Loading census data for details page...")
+
+      const { data, error } = await supabase.from("census_data").select("*").order("pro_code")
+
+      if (error) {
+        console.error("[v0] Error loading census data:", error)
+      } else {
+        setCensusData(data || [])
+        console.log("[v0] Census data loaded for details page:", data?.length || 0, "records")
+      }
+    } catch (error) {
+      console.error("[v0] Error loading census data:", error)
+    } finally {
+      setLoadingCensus(false)
+    }
+  }
+
   const handleDataRefresh = () => {
     loadSummaryCounts()
+    loadCensusData()
   }
 
   useEffect(() => {
@@ -204,6 +233,7 @@ export default function DataPage() {
       router.replace("/")
     } else if (isClient && isAuthenticated) {
       loadSummaryCounts()
+      loadCensusData()
     }
   }, [isAuthenticated, authLoading, router, isClient])
 
@@ -250,6 +280,11 @@ export default function DataPage() {
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-foreground mb-4">Data Management</h1>
           <p className="text-muted-foreground">Import, export, and manage Cambodia's administrative data</p>
+          {censusData.length > 0 && (
+            <div className="mt-2 text-sm text-muted-foreground">
+              Census Data: {censusData.length} provinces with demographic information available
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">

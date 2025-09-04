@@ -234,6 +234,8 @@ export function BoundaryImport({ onImportComplete }: BoundaryImportProps) {
             [unitIdField]: matchedUnit.id,
             geojson: feature.geometry,
             properties: feature.properties,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
           })
 
           if (insertError) {

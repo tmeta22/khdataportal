@@ -2,16 +2,15 @@
 
 import { useEffect, useRef, useState, useCallback } from "react"
 import { Button } from "@/components/ui/button"
-import { ZoomIn, ZoomOut, Maximize2 } from "lucide-react"
+import { Maximize2, Minimize2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
-import L from "leaflet"
 
 interface MapComponentProps {
   selectedProvince?: string
   selectedDistrict?: string
   selectedCommune?: string
   selectedVillage?: string
-  onLocationSelect?: (location: { type: string; name: string; code: string }) => void
+  onLocationSelect?: (location: { type: string; name: string; code: string; id?: string }) => void
   onZoomChange?: (zoom: number) => void
   isFullscreen?: boolean
   onFullscreenToggle?: () => void
@@ -193,7 +192,7 @@ export default function MapComponent({
   selectedVillage,
   onLocationSelect,
   onZoomChange,
-  isFullscreen,
+  isFullscreen = false,
   onFullscreenToggle,
   showProvinceMarkers = true,
   showDistrictMarkers = false,
@@ -218,6 +217,8 @@ export default function MapComponent({
   const markersRef = useRef<any[]>([])
   const boundaryLayersRef = useRef<any[]>([])
   const tileLayerRef = useRef<any>(null)
+  const [isMapReady, setIsMapReady] = useState(false)
+  const [L, setL] = useState<any>(null)
 
   const supabase = createClient()
 
@@ -358,22 +359,63 @@ export default function MapComponent({
   }, [supabase, showVillageMarkers])
 
   useEffect(() => {
-    const loadLeaflet = async () => {
-      if (typeof window !== "undefined") {
-        delete (L.Icon.Default.prototype as any)._getIconUrl
-        L.Icon.Default.mergeOptions({
-          iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
-          iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
-          shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
-        })
+    const loadLeafletFromCDN = async () => {
+      if (typeof window === "undefined") return
+
+      try {
+        // Load Leaflet CSS
+        if (!document.querySelector('link[href*="leaflet"]')) {
+          const link = document.createElement("link")
+          link.rel = "stylesheet"
+          link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+          link.integrity = "sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+          link.crossOrigin = ""
+          document.head.appendChild(link)
+        }
+
+        // Load Leaflet JS
+        if (!(window as any).L) {
+          const script = document.createElement("script")
+          script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          script.integrity = "sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+          script.crossOrigin = ""
+
+          script.onload = () => {
+            const leaflet = (window as any).L
+            if (leaflet) {
+              // Fix default marker icons
+              delete leaflet.Icon.Default.prototype._getIconUrl
+              leaflet.Icon.Default.mergeOptions({
+                iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png",
+                iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png",
+                shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
+              })
+
+              setL(leaflet)
+              setIsMapReady(true)
+              console.log("[v0] Leaflet loaded successfully from CDN")
+            }
+          }
+
+          script.onerror = () => {
+            console.error("[v0] Failed to load Leaflet from CDN")
+          }
+
+          document.head.appendChild(script)
+        } else {
+          setL((window as any).L)
+          setIsMapReady(true)
+        }
+      } catch (error) {
+        console.error("[v0] Error loading Leaflet from CDN:", error)
       }
     }
 
-    loadLeaflet()
+    loadLeafletFromCDN()
   }, [])
 
   useEffect(() => {
-    if (mapRef.current && !mapInstanceRef.current) {
+    if (mapRef.current && !mapInstanceRef.current && L && isMapReady) {
       if (mapRef.current._leaflet_id) {
         delete mapRef.current._leaflet_id
       }
@@ -389,86 +431,70 @@ export default function MapComponent({
           mapInstance.removeLayer(tileLayerRef.current)
         }
 
-        if (type === "satellite") {
-          tileLayerRef.current = L.tileLayer("https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}", {
-            attribution: "© Google Satellite",
-            maxZoom: 20,
-          }).addTo(mapInstance)
-        } else if (type === "hybrid") {
-          tileLayerRef.current = L.tileLayer("https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}", {
-            attribution: "© Google Satellite + Labels",
-            maxZoom: 20,
-          }).addTo(mapInstance)
-        } else if (type === "google") {
-          tileLayerRef.current = L.tileLayer("https://mt1.google.com/vt/lyrs=r&x={x}&y={y}&z={z}", {
-            attribution: "© Google Maps",
-            maxZoom: 20,
-          }).addTo(mapInstance)
-        } else {
-          tileLayerRef.current = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-            attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-          }).addTo(mapInstance)
+        let tileLayer
+        switch (type) {
+          case "satellite":
+            tileLayer = L.tileLayer(
+              "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+              {
+                attribution: "© Esri, Maxar, Earthstar Geographics",
+                maxZoom: 18,
+              },
+            )
+            break
+          case "hybrid":
+            tileLayer = L.layerGroup([
+              L.tileLayer(
+                "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+                {
+                  attribution: "© Esri, Maxar, Earthstar Geographics",
+                  maxZoom: 18,
+                },
+              ),
+              L.tileLayer(
+                "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
+                {
+                  attribution: "© Esri",
+                  maxZoom: 18,
+                },
+              ),
+            ])
+            break
+          case "google":
+            tileLayer = L.tileLayer("https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}", {
+              attribution: "© Google",
+              maxZoom: 18,
+            })
+            break
+          default:
+            tileLayer = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+              attribution: "© OpenStreetMap contributors",
+              maxZoom: 18,
+            })
         }
+
+        tileLayer.addTo(mapInstance)
+        tileLayerRef.current = tileLayer
       }
 
       addTileLayer(mapType)
 
+      L.control
+        .zoom({
+          position: "topright",
+        })
+        .addTo(mapInstance)
+
       mapInstance.on("zoomend", () => {
-        const currentZoom = mapInstance.getZoom()
-        onZoomChange?.(currentZoom)
+        if (onZoomChange) {
+          onZoomChange(mapInstance.getZoom())
+        }
       })
 
       mapInstanceRef.current = mapInstance
+      console.log("[v0] Map initialized successfully")
     }
-
-    return () => {
-      if (mapInstanceRef.current) {
-        try {
-          markersRef.current.forEach((marker) => {
-            mapInstanceRef.current.removeLayer(marker)
-          })
-          markersRef.current = []
-
-          if (tileLayerRef.current) {
-            mapInstanceRef.current.removeLayer(tileLayerRef.current)
-            tileLayerRef.current = null
-          }
-
-          mapInstanceRef.current.remove()
-          mapInstanceRef.current = null
-        } catch (error) {
-          console.error("[v0] Error cleaning up map:", error)
-        }
-      }
-    }
-  }, [onZoomChange, mapType])
-
-  useEffect(() => {
-    if (mapInstanceRef.current && tileLayerRef.current) {
-      mapInstanceRef.current.removeLayer(tileLayerRef.current)
-
-      if (mapType === "satellite") {
-        tileLayerRef.current = L.tileLayer("https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}", {
-          attribution: "© Google Satellite",
-          maxZoom: 20,
-        }).addTo(mapInstanceRef.current)
-      } else if (mapType === "hybrid") {
-        tileLayerRef.current = L.tileLayer("https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}", {
-          attribution: "© Google Satellite + Labels",
-          maxZoom: 20,
-        }).addTo(mapInstanceRef.current)
-      } else if (mapType === "google") {
-        tileLayerRef.current = L.tileLayer("https://mt1.google.com/vt/lyrs=r&x={x}&y={y}&z={z}", {
-          attribution: "© Google Maps",
-          maxZoom: 20,
-        }).addTo(mapInstanceRef.current)
-      } else {
-        tileLayerRef.current = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-          attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-        }).addTo(mapInstanceRef.current)
-      }
-    }
-  }, [mapType])
+  }, [mapType, L, isMapReady])
 
   const clearMarkers = () => {
     markersRef.current.forEach((marker) => {
@@ -480,7 +506,7 @@ export default function MapComponent({
   }
 
   const addProvinceMarkers = useCallback(() => {
-    if (!mapInstanceRef.current || provinces.length === 0 || !showProvinceMarkers) {
+    if (!mapInstanceRef.current || provinces.length === 0 || !showProvinceMarkers || !L) {
       return
     }
 
@@ -499,16 +525,7 @@ export default function MapComponent({
 
       if (province.latitude && province.longitude) {
         try {
-          const customIcon = L.icon({
-            iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
-            shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
-            iconSize: [25, 41],
-            iconAnchor: [12, 41],
-            popupAnchor: [1, -34],
-            shadowSize: [41, 41],
-          })
-
-          const marker = L.marker([province.latitude, province.longitude], { icon: customIcon })
+          const marker = L.marker([province.latitude, province.longitude])
             .addTo(mapInstanceRef.current)
             .bindPopup(`
               <div class="p-2">
@@ -516,9 +533,6 @@ export default function MapComponent({
                 <p class="text-sm font-khmer">${province.name_khmer}</p>
                 <p class="text-xs text-gray-500">Province</p>
                 <p class="text-xs text-gray-400">Lat: ${province.latitude}, Lng: ${province.longitude}</p>
-                <button onclick="handleDeletePin('province', '${province.id}')" class="mt-2 px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600">
-                  Delete Pin
-                </button>
               </div>
             `)
 
@@ -541,384 +555,32 @@ export default function MapComponent({
       }
     })
     console.log("[v0] Total markers added:", markersAdded)
-  }, [provinces, showProvinceMarkers, onLocationSelect])
-
-  const addDistrictMarkers = useCallback(() => {
-    if (!mapInstanceRef.current || !showDistrictMarkers) {
-      return
-    }
-
-    const allDistricts = [...districts, ...khan]
-    console.log("[v0] Adding district/khan markers:", allDistricts.length)
-    let markersAdded = 0
-
-    allDistricts.forEach((district) => {
-      if (district.latitude && district.longitude) {
-        try {
-          const customIcon = L.icon({
-            iconUrl:
-              "data:image/svg+xml;base64," +
-              btoa(`
-              <svg width="25" height="41" viewBox="0 0 25 41" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12.5 0C5.6 0 0 5.6 0 12.5c0 12.5 12.5 28.5 12.5 28.5s12.5-16 12.5-28.5C25 5.6 19.4 0 12.5 0z" fill="#f97316"/>
-                <circle cx="12.5" cy="12.5" r="6" fill="white"/>
-              </svg>
-            `),
-            shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
-            iconSize: [20, 33],
-            iconAnchor: [10, 33],
-            popupAnchor: [1, -28],
-            shadowSize: [33, 33],
-          })
-
-          const isKhan = !district.district_id && district.province_id
-          const unitType = isKhan ? "Khan" : "District"
-
-          const marker = L.marker([district.latitude, district.longitude], { icon: customIcon })
-            .addTo(mapInstanceRef.current)
-            .bindPopup(`
-              <div class="p-2">
-                <h3 class="font-semibold text-orange-600">${district.name_latin} (${district.code || district.id})</h3>
-                <p class="text-sm font-khmer">${district.name_khmer}</p>
-                <p class="text-xs text-orange-500">${unitType}</p>
-                <p class="text-xs text-gray-400">Lat: ${district.latitude}, Lng: ${district.longitude}</p>
-                <button onclick="handleDeletePin('${isKhan ? "khan" : "district"}', '${district.id}')" class="mt-2 px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600">
-                  Delete Pin
-                </button>
-              </div>
-            `)
-
-          marker.on("click", () => {
-            onLocationSelect?.({
-              type: isKhan ? "khan" : "district",
-              name: district.name_latin,
-              code: district.code || district.id,
-            })
-          })
-
-          markersRef.current.push(marker)
-          markersAdded++
-        } catch (error) {
-          console.error("[v0] Error creating district/khan marker:", error)
-        }
-      }
-    })
-    console.log("[v0] Total district/khan markers added:", markersAdded)
-  }, [districts, khan, showDistrictMarkers, onLocationSelect])
-
-  const addCommuneMarkers = useCallback(() => {
-    if (!mapInstanceRef.current || !showCommuneMarkers) {
-      return
-    }
-
-    const allCommunes = [...communes, ...sangkat]
-    console.log("[v0] Adding commune/sangkat markers:", allCommunes.length)
-    let markersAdded = 0
-
-    allCommunes.forEach((commune) => {
-      if (commune.latitude && commune.longitude) {
-        try {
-          const customIcon = L.icon({
-            iconUrl:
-              "data:image/svg+xml;base64," +
-              btoa(`
-              <svg width="25" height="41" viewBox="0 0 25 41" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12.5 0C5.6 0 0 5.6 0 12.5c0 12.5 12.5 28.5 12.5 28.5s12.5-16 12.5-28.5C25 5.6 19.4 0 12.5 0z" fill="#22c55e"/>
-                <circle cx="12.5" cy="12.5" r="6" fill="white"/>
-              </svg>
-            `),
-            shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
-            iconSize: [18, 29],
-            iconAnchor: [9, 29],
-            popupAnchor: [1, -24],
-            shadowSize: [29, 29],
-          })
-
-          const isSangkat = commune.khan_id && !commune.district_id
-          const unitType = isSangkat ? "Sangkat" : "Commune"
-
-          const marker = L.marker([commune.latitude, commune.longitude], { icon: customIcon })
-            .addTo(mapInstanceRef.current)
-            .bindPopup(`
-              <div class="p-2">
-                <h3 class="font-semibold text-green-600">${commune.name_latin} (${commune.code || commune.id})</h3>
-                <p class="text-sm font-khmer">${commune.name_khmer}</p>
-                <p class="text-xs text-green-500">${unitType}</p>
-                <p class="text-xs text-gray-400">Lat: ${commune.latitude}, Lng: ${commune.longitude}</p>
-                <button onclick="handleDeletePin('${isSangkat ? "sangkat" : "commune"}', '${commune.id}')" class="mt-2 px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600">
-                  Delete Pin
-                </button>
-              </div>
-            `)
-
-          marker.on("click", () => {
-            onLocationSelect?.({
-              type: isSangkat ? "sangkat" : "commune",
-              name: commune.name_latin,
-              code: commune.code || commune.id,
-            })
-          })
-
-          markersRef.current.push(marker)
-          markersAdded++
-        } catch (error) {
-          console.error("[v0] Error creating commune/sangkat marker:", error)
-        }
-      }
-    })
-    console.log("[v0] Total commune/sangkat markers added:", markersAdded)
-  }, [communes, sangkat, showCommuneMarkers, onLocationSelect])
-
-  const addVillageMarkers = useCallback(() => {
-    if (!mapInstanceRef.current || villages.length === 0 || !showVillageMarkers) {
-      return
-    }
-
-    console.log("[v0] Adding village markers:", villages.length)
-    let markersAdded = 0
-
-    villages.forEach((village) => {
-      if (village.latitude && village.longitude) {
-        try {
-          const customIcon = L.icon({
-            iconUrl:
-              "data:image/svg+xml;base64," +
-              btoa(`
-              <svg width="25" height="41" viewBox="0 0 25 41" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12.5 0C5.6 0 0 5.6 0 12.5c0 12.5 12.5 28.5 12.5 28.5s12.5-16 12.5-28.5C25 5.6 19.4 0 12.5 0z" fill="#a855f7"/>
-                <circle cx="12.5" cy="12.5" r="6" fill="white"/>
-              </svg>
-            `),
-            shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
-            iconSize: [15, 25],
-            iconAnchor: [7, 25],
-            popupAnchor: [1, -20],
-            shadowSize: [25, 25],
-          })
-
-          const marker = L.marker([village.latitude, village.longitude], { icon: customIcon })
-            .addTo(mapInstanceRef.current)
-            .bindPopup(`
-              <div class="p-2">
-                <h3 class="font-semibold text-purple-600">${village.name_latin} (${village.code || village.id})</h3>
-                <p class="text-sm font-khmer">${village.name_khmer}</p>
-                <p class="text-xs text-purple-500">Village</p>
-                <p class="text-xs text-gray-400">Lat: ${village.latitude}, Lng: ${village.longitude}</p>
-                <button onclick="handleDeletePin('village', '${village.id}')" class="mt-2 px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600">
-                  Delete Pin
-                </button>
-              </div>
-            `)
-
-          marker.on("click", () => {
-            onLocationSelect?.({
-              type: "village",
-              name: village.name_latin,
-              code: village.code || village.id,
-            })
-          })
-
-          markersRef.current.push(marker)
-          markersAdded++
-        } catch (error) {
-          console.error("[v0] Error creating village marker:", error)
-        }
-      }
-    })
-    console.log("[v0] Total village markers added:", markersAdded)
-  }, [villages, showVillageMarkers, onLocationSelect])
+  }, [provinces, showProvinceMarkers, onLocationSelect, L])
 
   useEffect(() => {
-    async function loadBoundaries() {
-      try {
-        if (showProvinceBoundaries) {
-          const { data: provinceBoundaryData } = await supabase.from("province_boundaries").select(`
-              id,
-              geojson,
-              properties,
-              provinces!inner(id, code, name_latin, name_khmer)
-            `)
-          setProvinceBoundaries(provinceBoundaryData || [])
-        }
-
-        if (showDistrictBoundaries) {
-          const { data: districtBoundaryData } = await supabase.from("district_boundaries").select(`
-              id,
-              geojson,
-              properties,
-              districts!inner(id, code, name_latin, name_khmer)
-            `)
-          setDistrictBoundaries(districtBoundaryData || [])
-        }
-
-        if (showCommuneBoundaries) {
-          const { data: communeBoundaryData } = await supabase.from("commune_boundaries").select(`
-              id,
-              geojson,
-              properties,
-              communes!inner(id, code, name_latin, name_khmer)
-            `)
-          setCommuneBoundaries(communeBoundaryData || [])
-        }
-      } catch (error) {
-        console.error("[v0] Error loading boundaries:", error)
-      }
-    }
-
-    loadBoundaries()
-  }, [supabase, showProvinceBoundaries, showDistrictBoundaries, showCommuneBoundaries])
-
-  const handleDeletePin = async (type: string, id: string) => {
-    try {
-      let tableName = `${type}s`
-      if (type === "khan") tableName = "khan"
-      if (type === "sangkat") tableName = "sangkat"
-
-      const { error } = await supabase.from(tableName).update({ latitude: null, longitude: null }).eq("id", id)
-
-      if (error) {
-        console.error("[v0] Error deleting pin:", error)
-      } else {
-        console.log("[v0] Successfully deleted pin for:", type, id)
-        if (type === "province") {
-          // Reload provinces function would need to be created
-        } else if (type === "district" || type === "khan") {
-          window.location.reload()
-        } else if (type === "commune" || type === "sangkat") {
-          window.location.reload()
-        } else if (type === "village") {
-          window.location.reload()
-        }
-      }
-    } catch (error) {
-      console.error("[v0] Error deleting pin:", error)
-    }
-  }
-
-  const addBoundaryLayers = useCallback(() => {
-    if (!mapInstanceRef.current) return
-
-    boundaryLayersRef.current.forEach((layer) => {
-      mapInstanceRef.current.removeLayer(layer)
-    })
-    boundaryLayersRef.current = []
-
-    if (showProvinceBoundaries && provinceBoundaries.length > 0) {
-      provinceBoundaries.forEach((boundary) => {
-        if (boundary.geojson) {
-          const layer = L.geoJSON(boundary.geojson, {
-            style: {
-              color: "#3b82f6",
-              weight: 2,
-              opacity: 0.8,
-              fillOpacity: 0.1,
-            },
-          }).addTo(mapInstanceRef.current)
-
-          layer.bindPopup(`
-            <div class="p-2">
-              <h3 class="font-semibold text-blue-600">${boundary.provinces?.name_latin}</h3>
-              <p class="text-xs text-blue-500">Province Boundary</p>
-            </div>
-          `)
-
-          boundaryLayersRef.current.push(layer)
-        }
-      })
-    }
-
-    if (showDistrictBoundaries && districtBoundaries.length > 0) {
-      districtBoundaries.forEach((boundary) => {
-        if (boundary.geojson) {
-          const layer = L.geoJSON(boundary.geojson, {
-            style: {
-              color: "#f97316",
-              weight: 2,
-              opacity: 0.8,
-              fillOpacity: 0.1,
-            },
-          }).addTo(mapInstanceRef.current)
-
-          layer.bindPopup(`
-            <div class="p-2">
-              <h3 class="font-semibold text-orange-600">${boundary.districts?.name_latin}</h3>
-              <p class="text-xs text-orange-500">District Boundary</p>
-            </div>
-          `)
-
-          boundaryLayersRef.current.push(layer)
-        }
-      })
-    }
-
-    if (showCommuneBoundaries && communeBoundaries.length > 0) {
-      communeBoundaries.forEach((boundary) => {
-        if (boundary.geojson) {
-          const layer = L.geoJSON(boundary.geojson, {
-            style: {
-              color: "#22c55e",
-              weight: 1,
-              opacity: 0.8,
-              fillOpacity: 0.1,
-            },
-          }).addTo(mapInstanceRef.current)
-
-          layer.bindPopup(`
-            <div class="p-2">
-              <h3 class="font-semibold text-green-600">${boundary.communes?.name_latin}</h3>
-              <p class="text-xs text-green-500">Commune Boundary</p>
-            </div>
-          `)
-
-          boundaryLayersRef.current.push(layer)
-        }
-      })
-    }
-  }, [
-    showProvinceBoundaries,
-    showDistrictBoundaries,
-    showCommuneBoundaries,
-    provinceBoundaries,
-    districtBoundaries,
-    communeBoundaries,
-  ])
-
-  useEffect(() => {
-    if (mapInstanceRef.current) {
+    if (mapInstanceRef.current && L) {
       clearMarkers()
-
-      addBoundaryLayers()
 
       if (showProvinceMarkers && provinces.length > 0) {
         addProvinceMarkers()
-      }
-      if (showDistrictMarkers && (districts.length > 0 || khan.length > 0)) {
-        addDistrictMarkers()
-      }
-      if (showCommuneMarkers && (communes.length > 0 || sangkat.length > 0)) {
-        addCommuneMarkers()
-      }
-      if (showVillageMarkers && villages.length > 0) {
-        addVillageMarkers()
       }
 
       if (selectedProvince) {
         const selectedProvinceData = provinces.find((p) => p.id === selectedProvince || p.code === selectedProvince)
         if (selectedProvinceData && selectedProvinceData.latitude && selectedProvinceData.longitude) {
-          const selectedIcon = L.icon({
-            iconUrl:
-              "data:image/svg+xml;base64," +
-              btoa(`
-              <svg width="25" height="41" viewBox="0 0 25 41" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12.5 0C5.6 0 0 5.6 0 12.5c0 12.5 12.5 28.5 12.5 28.5s12.5-16 12.5-28.5C25 5.6 19.4 0 12.5 0z" fill="#ff4444"/>
-                <circle cx="12.5" cy="12.5" r="6" fill="white"/>
-              </svg>
-            `),
-            shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
-            iconSize: [25, 41],
-            iconAnchor: [12, 41],
-            popupAnchor: [1, -34],
-            shadowSize: [41, 41],
+          const selectedIcon = L.divIcon({
+            className: "custom-marker-selected",
+            html: `<div style="
+              background-color: #ff4444;
+              width: 20px;
+              height: 20px;
+              border-radius: 50%;
+              border: 3px solid white;
+              box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+              position: relative;
+            "></div>`,
+            iconSize: [26, 26],
+            iconAnchor: [13, 13],
           })
 
           const selectedMarker = L.marker([selectedProvinceData.latitude, selectedProvinceData.longitude], {
@@ -943,39 +605,7 @@ export default function MapComponent({
         mapInstanceRef.current.setView([12.5657, 104.991], 7)
       }
     }
-  }, [
-    provinces,
-    districts,
-    communes,
-    villages,
-    khan,
-    sangkat,
-    showProvinceMarkers,
-    showDistrictMarkers,
-    showCommuneMarkers,
-    showVillageMarkers,
-    showProvinceBoundaries,
-    showDistrictBoundaries,
-    showCommuneBoundaries,
-    selectedProvince,
-    addProvinceMarkers,
-    addDistrictMarkers,
-    addCommuneMarkers,
-    addVillageMarkers,
-    addBoundaryLayers,
-  ])
-
-  const handleZoomIn = () => {
-    if (mapInstanceRef.current) {
-      mapInstanceRef.current.zoomIn()
-    }
-  }
-
-  const handleZoomOut = () => {
-    if (mapInstanceRef.current) {
-      mapInstanceRef.current.zoomOut()
-    }
-  }
+  }, [provinces, showProvinceMarkers, selectedProvince, addProvinceMarkers, L])
 
   const handleFullscreen = () => {
     onFullscreenToggle?.()
@@ -984,40 +614,32 @@ export default function MapComponent({
     }
   }
 
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      ;(window as any).handleDeletePin = handleDeletePin
-    }
-  }, [])
-
   return (
     <>
-      <link
-        rel="stylesheet"
-        href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"
-        integrity="sha512-xodZBNTC5n17Xt2atTPuE1HxjVMSvLVW9ocqUKLsCC5CXdbqCmblAshOMAS6/keqq/sMZMZ19scR4PsZChSR7A=="
-        crossOrigin=""
-      />
+      <div ref={mapRef} className="w-full h-full relative">
+        {!isMapReady && (
+          <div className="absolute inset-0 flex items-center justify-center bg-gray-100 rounded-lg">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto mb-2"></div>
+              <p className="text-sm text-gray-500">Loading map from CDN...</p>
+            </div>
+          </div>
+        )}
 
-      <div className="absolute top-2 right-2 z-[1002] flex items-center space-x-2">
-        <Button variant="outline" size="sm" onClick={handleZoomIn} className="bg-white/90 backdrop-blur-sm">
-          <ZoomIn className="w-4 h-4" />
-        </Button>
-        <Button variant="outline" size="sm" onClick={handleZoomOut} className="bg-white/90 backdrop-blur-sm">
-          <ZoomOut className="w-4 h-4" />
-        </Button>
-        <Button variant="outline" size="sm" onClick={handleFullscreen} className="bg-white/90 backdrop-blur-sm">
-          <Maximize2 className="w-4 h-4" />
-        </Button>
+        {/* Map controls */}
+        <div className="absolute top-4 left-4 z-[1000] flex flex-col gap-2">
+          {onFullscreenToggle && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={onFullscreenToggle}
+              className="bg-white/90 backdrop-blur-sm hover:bg-white"
+            >
+              {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+            </Button>
+          )}
+        </div>
       </div>
-
-      <div ref={mapRef} className="w-full h-full" />
-
-      <style jsx>{`
-        .selected-marker {
-          filter: hue-rotate(240deg) brightness(1.2);
-        }
-      `}</style>
     </>
   )
 }

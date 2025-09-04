@@ -227,15 +227,18 @@ export default function HomePage() {
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="text-center md:text-left">
               <p className="text-sm text-muted-foreground">
-                Data source: <span className="font-medium">Gazetteer Database Online</span> | Built with{" "}
-                <span className="font-medium">AI-Meta@2025 | Inspired by Cambodia Local Guides</span>
+                Data source:{" "}
+                <span className="font-medium">
+                  Gazetteer Database Online & National Committee for Sub-National Democratic Development (NCDDS)
+                </span>
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                Official administrative data from National Committee for Sub-National Democratic Development (NCDDS)
+                © 2025 Cambodia Administrative Data Portal | Built with AI-Meta@2025 | Inspired by Cambodia Local
+                Guides.
               </p>
             </div>
             <div className="flex items-center gap-4">
-              <span className="text-xs text-muted-foreground">© 2025 Cambodia Administrative Data Portal</span>
+              <span className="text-xs text-muted-foreground">All rights reserved.</span>
             </div>
           </div>
         </div>

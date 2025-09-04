@@ -560,7 +560,11 @@ export default function DetailsPage() {
                 </div>
               </Card>
 
-              
+              {/* Recent Updates */}
+              <Card className="p-4">
+                <h3 className="font-semibold mb-4">Recent Updates</h3>
+                <RecentUpdates />
+              </Card>
             </div>
           </div>
         </>
