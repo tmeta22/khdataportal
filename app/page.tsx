@@ -223,22 +223,7 @@ export default function HomePage() {
       <PWAInstallPrompt />
 
       <footer className="bg-muted/30 border-t mt-12">
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="text-center md:text-left">
-              <p className="text-sm text-muted-foreground">
-                Data source: <span className="font-medium">Gazetteer Database Online</span> | Built with{" "}
-                <span className="font-medium">AI-Meta@2025 | Inspired by Cambodia Local Guides</span>
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Official administrative data from National Committee for Sub-National Democratic Development (NCDDS)
-              </p>
-            </div>
-            <div className="flex items-center gap-4">
-              <span className="text-xs text-muted-foreground">© 2025 Cambodia Administrative Data Portal</span>
-            </div>
-          </div>
-        </div>
+        
       </footer>
     </div>
   )
