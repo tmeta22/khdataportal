@@ -14,12 +14,8 @@ export function Footer() {
         <div className="container mx-auto px-4 py-6">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="text-center md:text-left">
-              <p className="text-sm text-muted-foreground">
-                © 2024 Cambodia Administrative Data Portal. All rights reserved.
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Data source: National Institute of Statistics, Ministry of Planning, Kingdom of Cambodia
-              </p>
+              
+              
             </div>
 
             <div className="flex items-center gap-2">
