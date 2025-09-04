@@ -123,7 +123,7 @@ export function EnhancedMapLegend({ onLayerToggle, layerStates, statistics }: Ma
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="administrative" className="space-y-3 mt-4">
+            <TabsContent value="administrative" className="space-y-3 mt-4 max-h-80 overflow-y-auto">
               {administrativeLevels.map((level) => (
                 <div key={level.key} className="space-y-2">
                   <div className="flex items-center space-x-3">
@@ -149,7 +149,7 @@ export function EnhancedMapLegend({ onLayerToggle, layerStates, statistics }: Ma
               ))}
             </TabsContent>
 
-            <TabsContent value="boundaries" className="space-y-3 mt-4">
+            <TabsContent value="boundaries" className="space-y-3 mt-4 max-h-80 overflow-y-auto">
               {boundaryLayers.map((boundary) => (
                 <div key={boundary.key} className="space-y-2">
                   <div className="flex items-center space-x-3">
