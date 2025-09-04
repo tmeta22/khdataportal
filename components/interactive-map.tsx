@@ -290,7 +290,7 @@ export function InteractiveMap({
         <CardContent>
           <div className={`relative rounded-lg overflow-hidden ${isFullscreen ? "h-[calc(100vh-200px)]" : "h-96"}`}>
             {legendVisible && (
-              <div className="absolute top-4 right-4 z-[1002] max-w-xs">
+              <div className="absolute top-4 right-4 z-[9999] max-w-xs">
                 <EnhancedMapLegend
                   onLayerToggle={handleLayerToggle}
                   layerStates={layerStates}
