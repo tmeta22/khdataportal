@@ -288,7 +288,9 @@ export function InteractiveMap({
           </div>
         </CardHeader>
         <CardContent>
-          <div className={`relative rounded-lg overflow-hidden ${isFullscreen ? "h-[calc(100vh-200px)]" : "h-96"}`}>
+          <div
+            className={`relative rounded-lg overflow-hidden ${isFullscreen ? "h-[calc(100vh-200px)]" : "h-[600px]"}`}
+          >
             {legendVisible && (
               <div className="absolute top-4 right-4 z-[9999] max-w-xs">
                 <EnhancedMapLegend
