@@ -100,7 +100,7 @@ export function EnhancedMapLegend({ onLayerToggle, layerStates, statistics }: Ma
   ]
 
   return (
-    <Card className="w-full">
+    <Card className="w-full shadow-xl z-50 relative">
       <CardHeader className="cursor-pointer pb-3" onClick={() => setIsExpanded(!isExpanded)}>
         <CardTitle className="flex items-center justify-between text-base">
           <div className="flex items-center gap-2">
