@@ -16,6 +16,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { MapPin, Users, BarChart3, Map, Download, Share, Edit, Save, X, ArrowLeft } from "lucide-react"
 import { useAuth } from "@/components/auth-provider"
 import { createClient } from "@/lib/supabase/client"
+import CensusImportDetails from "@/components/census-import-details"
 
 const LocationMap = dynamic(() => import("@/components/location-map"), {
   ssr: false,
@@ -98,19 +99,18 @@ export default function DetailsPage() {
       console.log("[v0] Loading census data for province:", provinceName)
 
       let census = null
-      const error = null
 
-      // First try exact match
-      const exactMatch = await supabase.from("census_data").select("*").eq("province_name", provinceName).single()
+      // First try exact match on provinces column
+      const exactMatch = await supabase.from("census_data").select("*").eq("provinces", provinceName).single()
 
       if (exactMatch.data) {
         census = exactMatch.data
       } else {
-        // Try case-insensitive match
+        // Try case-insensitive match on provinces column
         const caseInsensitiveMatch = await supabase
           .from("census_data")
           .select("*")
-          .ilike("province_name", provinceName)
+          .ilike("provinces", provinceName)
           .single()
 
         if (caseInsensitiveMatch.data) {
@@ -120,7 +120,7 @@ export default function DetailsPage() {
           const partialMatch = await supabase
             .from("census_data")
             .select("*")
-            .or(`province_name.ilike.%${provinceName}%,provinces.ilike.%${provinceName}%`)
+            .or(`provinces.ilike.%${provinceName}%,provinces_kh.ilike.%${provinceName}%`)
             .single()
 
           if (partialMatch.data) {
@@ -287,6 +287,12 @@ export default function DetailsPage() {
       a.click()
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
+    }
+  }
+
+  const handleCensusImportComplete = () => {
+    if (selectedProvince) {
+      loadCensusData(selectedProvince.name_latin)
     }
   }
 
@@ -681,6 +687,10 @@ export default function DetailsPage() {
                     <Download className="w-4 h-4 mr-2" />
                     Export Data
                   </Button>
+                  <CensusImportDetails
+                    provinceName={selectedProvince.name_latin}
+                    onImportComplete={handleCensusImportComplete}
+                  />
                 </div>
               </Card>
 
