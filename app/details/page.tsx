@@ -100,32 +100,52 @@ export default function DetailsPage() {
 
       let census = null
 
-      // First try exact match on provinces column
-      const exactMatch = await supabase.from("census_data").select("*").eq("provinces", provinceName).single()
-
-      if (exactMatch.data) {
-        census = exactMatch.data
-      } else {
-        // Try case-insensitive match on provinces column
-        const caseInsensitiveMatch = await supabase
+      // Try multiple matching strategies to find census data
+      const queries = [
+        // Exact match on provinces column
+        supabase
+          .from("census_data")
+          .select("*")
+          .eq("provinces", provinceName)
+          .maybeSingle(),
+        // Case-insensitive match on provinces column
+        supabase
           .from("census_data")
           .select("*")
           .ilike("provinces", provinceName)
-          .single()
+          .maybeSingle(),
+        // Try with "Province" suffix
+        supabase
+          .from("census_data")
+          .select("*")
+          .ilike("provinces", `${provinceName} Province`)
+          .maybeSingle(),
+        // Try without "Province" suffix if it exists
+        supabase
+          .from("census_data")
+          .select("*")
+          .ilike("provinces", provinceName.replace(" Province", ""))
+          .maybeSingle(),
+        // Partial match for provinces with different naming
+        supabase
+          .from("census_data")
+          .select("*")
+          .or(`provinces.ilike.%${provinceName}%,provinces_kh.ilike.%${provinceName}%`)
+          .maybeSingle(),
+        // Try matching by pro_code if available
+        supabase
+          .from("census_data")
+          .select("*")
+          .eq("pro_code", selectedProvince?.code)
+          .maybeSingle(),
+      ]
 
-        if (caseInsensitiveMatch.data) {
-          census = caseInsensitiveMatch.data
-        } else {
-          // Try partial match for provinces with different naming
-          const partialMatch = await supabase
-            .from("census_data")
-            .select("*")
-            .or(`provinces.ilike.%${provinceName}%,provinces_kh.ilike.%${provinceName}%`)
-            .single()
-
-          if (partialMatch.data) {
-            census = partialMatch.data
-          }
+      for (const query of queries) {
+        const result = await query
+        if (result.data && !result.error) {
+          census = result.data
+          console.log("[v0] Census data found using query strategy")
+          break
         }
       }
 
@@ -134,6 +154,11 @@ export default function DetailsPage() {
         setCensusData(census)
       } else {
         console.log("[v0] No census data found for:", provinceName)
+        const { data: allCensus } = await supabase.from("census_data").select("provinces, pro_code")
+        console.log(
+          "[v0] Available census provinces:",
+          allCensus?.map((c) => c.provinces),
+        )
         setCensusData(null)
       }
     } catch (error) {
@@ -398,7 +423,11 @@ export default function DetailsPage() {
                 <Users className="w-8 h-8 text-blue-600" />
                 <div>
                   <p className="text-sm text-muted-foreground">Population</p>
-                  <p className="text-2xl font-bold">{selectedProvince.population.toLocaleString()}</p>
+                  <p className="text-2xl font-bold">
+                    {censusData?.total
+                      ? censusData.total.toLocaleString()
+                      : selectedProvince.population.toLocaleString()}
+                  </p>
                 </div>
               </div>
             </Card>
@@ -408,7 +437,11 @@ export default function DetailsPage() {
                 <BarChart3 className="w-8 h-8 text-green-600" />
                 <div>
                   <p className="text-sm text-muted-foreground">Area</p>
-                  <p className="text-2xl font-bold">{selectedProvince.area.toLocaleString()} km²</p>
+                  <p className="text-2xl font-bold">
+                    {censusData?.area_km2
+                      ? `${censusData.area_km2.toLocaleString()} km²`
+                      : `${selectedProvince.area.toLocaleString()} km²`}
+                  </p>
                 </div>
               </div>
             </Card>
