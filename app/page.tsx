@@ -7,6 +7,7 @@ import { InteractiveMap } from "@/components/interactive-map"
 import { OverviewStats } from "@/components/overview-stats"
 import { SearchBar } from "@/components/search-bar"
 import PWAInstallPrompt from "@/components/pwa-install-prompt"
+import { CensusVisualization } from "@/components/census-visualization"
 import { createClient } from "@/lib/supabase/client"
 
 export const dynamic = "force-dynamic"
@@ -24,12 +25,14 @@ export default function HomePage() {
     communes: 1652,
     villages: 14564,
   })
+  const [censusData, setCensusData] = useState<any[]>([])
 
   const supabase = createClient()
 
   useEffect(() => {
     setMounted(true)
     loadStatistics()
+    loadCensusData()
   }, [])
 
   const loadStatistics = async () => {
@@ -65,6 +68,28 @@ export default function HomePage() {
     } catch (error) {
       console.error("[v0] Error loading welcome message statistics:", error)
       // Keep default values on error
+    }
+  }
+
+  const loadCensusData = async () => {
+    try {
+      console.log("[v0] Loading census data for visualization...")
+
+      const { data: census, error } = await supabase
+        .from("census_data")
+        .select("*")
+        .order("population", { ascending: false })
+
+      if (error) {
+        console.error("[v0] Error loading census data:", error)
+        setCensusData([])
+      } else {
+        console.log("[v0] Census data loaded:", census?.length || 0, "records")
+        setCensusData(census || [])
+      }
+    } catch (error) {
+      console.error("[v0] Error loading census data:", error)
+      setCensusData([])
     }
   }
 
@@ -207,6 +232,13 @@ export default function HomePage() {
             </div>
           </div>
 
+          {/* Census Data Visualization Section */}
+          {censusData.length > 0 && (
+            <div className="w-full">
+              <CensusVisualization data={censusData} />
+            </div>
+          )}
+
           {/* Bottom Row - Full Width Map */}
           <div className="w-full">
             <InteractiveMap
@@ -222,9 +254,7 @@ export default function HomePage() {
 
       <PWAInstallPrompt />
 
-      <footer className="bg-muted/30 border-t mt-12">
-        
-      </footer>
+      <footer className="bg-muted/30 border-t mt-12"></footer>
     </div>
   )
 }

@@ -95,18 +95,44 @@ export default function DetailsPage() {
     try {
       console.log("[v0] Loading census data for province:", provinceName)
 
-      const { data: census, error } = await supabase
-        .from("census_data")
-        .select("*")
-        .eq("province_name", provinceName)
-        .single()
+      let census = null
+      const error = null
 
-      if (error) {
-        console.log("[v0] No census data found for:", provinceName)
-        setCensusData(null)
+      // First try exact match
+      const exactMatch = await supabase.from("census_data").select("*").eq("province_name", provinceName).single()
+
+      if (exactMatch.data) {
+        census = exactMatch.data
       } else {
+        // Try case-insensitive match
+        const caseInsensitiveMatch = await supabase
+          .from("census_data")
+          .select("*")
+          .ilike("province_name", provinceName)
+          .single()
+
+        if (caseInsensitiveMatch.data) {
+          census = caseInsensitiveMatch.data
+        } else {
+          // Try partial match for provinces with different naming
+          const partialMatch = await supabase
+            .from("census_data")
+            .select("*")
+            .or(`province_name.ilike.%${provinceName}%,provinces.ilike.%${provinceName}%`)
+            .single()
+
+          if (partialMatch.data) {
+            census = partialMatch.data
+          }
+        }
+      }
+
+      if (census) {
         console.log("[v0] Census data loaded:", census)
         setCensusData(census)
+      } else {
+        console.log("[v0] No census data found for:", provinceName)
+        setCensusData(null)
       }
     } catch (error) {
       console.error("[v0] Error loading census data:", error)
