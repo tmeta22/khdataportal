@@ -15,7 +15,6 @@ import { MapPin, Users, BarChart3, Map, Download, Share, Edit, Save, X, ArrowLef
 import { useAuth } from "@/components/auth-provider"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
-import "leaflet/dist/leaflet.css"
 
 const LocationMap = dynamic(() => import("@/components/location-map"), {
   ssr: false,
