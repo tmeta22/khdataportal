@@ -1,7 +1,5 @@
 "use client"
 
-import type React from "react"
-
 import { useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Maximize2, Minimize2, ZoomIn, ZoomOut } from "lucide-react"
@@ -15,8 +13,52 @@ interface Province {
   longitude: number
 }
 
+interface District {
+  id: string
+  code: string
+  name_latin: string
+  name_khmer: string
+  latitude: number
+  longitude: number
+}
+
+interface Commune {
+  id: string
+  code: string
+  name_latin: string
+  name_khmer: string
+  latitude: number
+  longitude: number
+}
+
+interface Village {
+  id: string
+  code: string
+  name_latin: string
+  name_khmer: string
+  latitude: number
+  longitude: number
+}
+
 interface SimpleMapProps {
   provinces: Province[]
+  districts?: District[]
+  communes?: Commune[]
+  villages?: Village[]
+  khan?: any[]
+  sangkat?: any[]
+  boundaries?: any[]
+  layerStates?: {
+    provinces: boolean
+    districts: boolean
+    communes: boolean
+    villages: boolean
+    khan: boolean
+    sangkat: boolean
+    provinceBoundaries: boolean
+    districtBoundaries: boolean
+    communeBoundaries: boolean
+  }
   selectedProvince?: string
   onLocationSelect?: (location: { type: string; name: string; code: string; id?: string }) => void
   onZoomChange?: (zoom: number) => void
@@ -26,6 +68,23 @@ interface SimpleMapProps {
 
 export default function SimpleMap({
   provinces,
+  districts = [],
+  communes = [],
+  villages = [],
+  khan = [],
+  sangkat = [],
+  boundaries = [],
+  layerStates = {
+    provinces: true,
+    districts: false,
+    communes: false,
+    villages: false,
+    khan: false,
+    sangkat: false,
+    provinceBoundaries: false,
+    districtBoundaries: false,
+    communeBoundaries: false,
+  },
   selectedProvince,
   onLocationSelect,
   onZoomChange,
@@ -56,53 +115,237 @@ export default function SimpleMap({
     return { x, y }
   }
 
-  const handleProvinceClick = (province: Province) => {
+  const handleLocationClick = (location: any, type: string) => {
     onLocationSelect?.({
-      type: "province",
-      name: province.name_latin,
-      code: province.code,
-      id: province.id,
+      type,
+      name: location.name_latin,
+      code: location.code,
+      id: location.id,
     })
+    console.log("[v0] Location selected from map:", { type, name: location.name_latin, code: location.code })
   }
 
-  const handleZoomIn = () => {
-    const newZoom = Math.min(zoom * 1.2, 3)
-    setZoom(newZoom)
-    onZoomChange?.(newZoom)
-  }
+  const getMarkerColor = (type: string, isSelected: boolean) => {
+    if (isSelected) return "#ef4444" // Red for selected
 
-  const handleZoomOut = () => {
-    const newZoom = Math.max(zoom / 1.2, 0.5)
-    setZoom(newZoom)
-    onZoomChange?.(newZoom)
-  }
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    setIsDragging(true)
-    setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y })
-  }
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (isDragging) {
-      setPan({
-        x: e.clientX - dragStart.x,
-        y: e.clientY - dragStart.y,
-      })
+    switch (type) {
+      case "province":
+        return "#3b82f6" // Blue
+      case "district":
+      case "khan":
+        return "#f97316" // Orange
+      case "commune":
+      case "sangkat":
+        return "#22c55e" // Green
+      case "village":
+        return "#a855f7" // Purple
+      default:
+        return "#6b7280" // Gray
     }
   }
 
-  const handleMouseUp = () => {
-    setIsDragging(false)
+  const renderMarkers = () => {
+    const markers = []
+
+    // Province markers
+    if (layerStates.provinces) {
+      provinces.forEach((province) => {
+        if (!province.latitude || !province.longitude) return
+
+        const { x, y } = latLngToSVG(province.latitude, province.longitude)
+        const isSelected = selectedProvince === province.id || selectedProvince === province.code
+
+        markers.push(
+          <g key={`province-${province.id}`}>
+            <circle
+              cx={x}
+              cy={y}
+              r={isSelected ? 8 : 6}
+              fill={getMarkerColor("province", isSelected)}
+              stroke="white"
+              strokeWidth="2"
+              className="cursor-pointer hover:r-7 transition-all duration-200"
+              onClick={() => handleLocationClick(province, "province")}
+            />
+            <text
+              x={x}
+              y={y - 12}
+              textAnchor="middle"
+              className="text-xs font-medium fill-gray-700 pointer-events-none select-none"
+              style={{ fontSize: "10px" }}
+            >
+              {province.name_latin}
+            </text>
+            <title>
+              Province: {province.name_latin} ({province.name_khmer}){"\n"}Code: {province.code}
+              {"\n"}Coordinates: {province.latitude.toFixed(4)}, {province.longitude.toFixed(4)}
+            </title>
+          </g>,
+        )
+      })
+    }
+
+    // District markers
+    if (layerStates.districts) {
+      districts.forEach((district) => {
+        if (!district.latitude || !district.longitude) return
+
+        const { x, y } = latLngToSVG(district.latitude, district.longitude)
+
+        markers.push(
+          <g key={`district-${district.id}`}>
+            <circle
+              cx={x}
+              cy={y}
+              r={5}
+              fill={getMarkerColor("district", false)}
+              stroke="white"
+              strokeWidth="1"
+              className="cursor-pointer hover:r-6 transition-all duration-200"
+              onClick={() => handleLocationClick(district, "district")}
+            />
+            <title>
+              District: {district.name_latin} ({district.name_khmer}){"\n"}Code: {district.code}
+              {"\n"}Coordinates: {district.latitude.toFixed(4)}, {district.longitude.toFixed(4)}
+            </title>
+          </g>,
+        )
+      })
+    }
+
+    // Khan markers (Phnom Penh urban districts)
+    if (layerStates.khan) {
+      khan.forEach((k) => {
+        if (!k.latitude || !k.longitude) return
+
+        const { x, y } = latLngToSVG(k.latitude, k.longitude)
+
+        markers.push(
+          <g key={`khan-${k.id}`}>
+            <circle
+              cx={x}
+              cy={y}
+              r={5}
+              fill={getMarkerColor("khan", false)}
+              stroke="white"
+              strokeWidth="1"
+              className="cursor-pointer hover:r-6 transition-all duration-200"
+              onClick={() => handleLocationClick(k, "khan")}
+            />
+            <title>
+              Khan: {k.name_latin} ({k.name_khmer}){"\n"}Code: {k.code}
+              {"\n"}Coordinates: {k.latitude.toFixed(4)}, {k.longitude.toFixed(4)}
+            </title>
+          </g>,
+        )
+      })
+    }
+
+    // Commune markers
+    if (layerStates.communes) {
+      communes.forEach((commune) => {
+        if (!commune.latitude || !commune.longitude) return
+
+        const { x, y } = latLngToSVG(commune.latitude, commune.longitude)
+
+        markers.push(
+          <g key={`commune-${commune.id}`}>
+            <circle
+              cx={x}
+              cy={y}
+              r={4}
+              fill={getMarkerColor("commune", false)}
+              stroke="white"
+              strokeWidth="1"
+              className="cursor-pointer hover:r-5 transition-all duration-200"
+              onClick={() => handleLocationClick(commune, "commune")}
+            />
+            <title>
+              Commune: {commune.name_latin} ({commune.name_khmer}){"\n"}Code: {commune.code}
+              {"\n"}Coordinates: {commune.latitude.toFixed(4)}, {commune.longitude.toFixed(4)}
+            </title>
+          </g>,
+        )
+      })
+    }
+
+    // Sangkat markers (Phnom Penh urban communes)
+    if (layerStates.sangkat) {
+      sangkat.forEach((s) => {
+        if (!s.latitude || !s.longitude) return
+
+        const { x, y } = latLngToSVG(s.latitude, s.longitude)
+
+        markers.push(
+          <g key={`sangkat-${s.id}`}>
+            <circle
+              cx={x}
+              cy={y}
+              r={4}
+              fill={getMarkerColor("sangkat", false)}
+              stroke="white"
+              strokeWidth="1"
+              className="cursor-pointer hover:r-5 transition-all duration-200"
+              onClick={() => handleLocationClick(s, "sangkat")}
+            />
+            <title>
+              Sangkat: {s.name_latin} ({s.name_khmer}){"\n"}Code: {s.code}
+              {"\n"}Coordinates: {s.latitude.toFixed(4)}, {s.longitude.toFixed(4)}
+            </title>
+          </g>,
+        )
+      })
+    }
+
+    // Village markers
+    if (layerStates.villages) {
+      villages.forEach((village) => {
+        if (!village.latitude || !village.longitude) return
+
+        const { x, y } = latLngToSVG(village.latitude, village.longitude)
+
+        markers.push(
+          <g key={`village-${village.id}`}>
+            <circle
+              cx={x}
+              cy={y}
+              r={3}
+              fill={getMarkerColor("village", false)}
+              stroke="white"
+              strokeWidth="1"
+              className="cursor-pointer hover:r-4 transition-all duration-200"
+              onClick={() => handleLocationClick(village, "village")}
+            />
+            <title>
+              Village: {village.name_latin} ({village.name_khmer}){"\n"}Code: {village.code}
+              {"\n"}Coordinates: {village.latitude.toFixed(4)}, {village.longitude.toFixed(4)}
+            </title>
+          </g>,
+        )
+      })
+    }
+
+    return markers
   }
 
   return (
     <div className="w-full h-full relative bg-blue-50 rounded-lg overflow-hidden">
       {/* Map Controls */}
       <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
-        <Button variant="secondary" size="sm" onClick={handleZoomIn} className="bg-white/90 backdrop-blur-sm">
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => setZoom(Math.min(zoom * 1.2, 3))}
+          className="bg-white/90 backdrop-blur-sm"
+        >
           <ZoomIn className="w-4 h-4" />
         </Button>
-        <Button variant="secondary" size="sm" onClick={handleZoomOut} className="bg-white/90 backdrop-blur-sm">
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => setZoom(Math.max(zoom / 1.2, 0.5))}
+          className="bg-white/90 backdrop-blur-sm"
+        >
           <ZoomOut className="w-4 h-4" />
         </Button>
         {onFullscreenToggle && (
@@ -115,10 +358,20 @@ export default function SimpleMap({
       {/* Map Container */}
       <div
         className="w-full h-full cursor-grab active:cursor-grabbing"
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
+        onMouseDown={(e) => {
+          setIsDragging(true)
+          setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y })
+        }}
+        onMouseMove={(e) => {
+          if (isDragging) {
+            setPan({
+              x: e.clientX - dragStart.x,
+              y: e.clientY - dragStart.y,
+            })
+          }
+        }}
+        onMouseUp={() => setIsDragging(false)}
+        onMouseLeave={() => setIsDragging(false)}
       >
         <svg
           ref={svgRef}
@@ -140,46 +393,7 @@ export default function SimpleMap({
             opacity="0.3"
           />
 
-          {/* Province markers */}
-          {provinces.map((province) => {
-            if (!province.latitude || !province.longitude) return null
-
-            const { x, y } = latLngToSVG(province.latitude, province.longitude)
-            const isSelected = selectedProvince === province.id || selectedProvince === province.code
-
-            return (
-              <g key={province.id}>
-                {/* Province marker */}
-                <circle
-                  cx={x}
-                  cy={y}
-                  r={isSelected ? 8 : 6}
-                  fill={isSelected ? "#ef4444" : "#3b82f6"}
-                  stroke="white"
-                  strokeWidth="2"
-                  className="cursor-pointer hover:r-7 transition-all duration-200"
-                  onClick={() => handleProvinceClick(province)}
-                />
-
-                {/* Province label */}
-                <text
-                  x={x}
-                  y={y - 12}
-                  textAnchor="middle"
-                  className="text-xs font-medium fill-gray-700 pointer-events-none select-none"
-                  style={{ fontSize: "10px" }}
-                >
-                  {province.name_latin}
-                </text>
-
-                {/* Tooltip on hover */}
-                <title>
-                  {province.name_latin} ({province.name_khmer}){"\n"}Code: {province.code}
-                  {"\n"}Coordinates: {province.latitude.toFixed(4)}, {province.longitude.toFixed(4)}
-                </title>
-              </g>
-            )
-          })}
+          {renderMarkers()}
 
           {/* Selected province highlight */}
           {selectedProvince &&
@@ -219,8 +433,8 @@ export default function SimpleMap({
       {/* Map Info */}
       <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur-sm rounded-lg p-3 text-xs text-gray-600">
         <div>Zoom: {zoom.toFixed(1)}x</div>
-        <div>Provinces: {provinces.length}</div>
-        <div>Click markers to select provinces</div>
+        <div>Visible Layers: {Object.values(layerStates).filter(Boolean).length}</div>
+        <div>Click markers to select locations</div>
       </div>
 
       {/* Attribution */}
