@@ -1,5 +1,7 @@
 "use client"
 
+import { useRouter } from "next/navigation"
+
 import { useState, useEffect } from "react"
 import dynamic from "next/dynamic"
 import { Card } from "@/components/ui/card"
@@ -14,9 +16,9 @@ import { Textarea } from "@/components/ui/textarea"
 import { MapPin, Users, BarChart3, Map, Download, Share, Edit, Save, X, ArrowLeft } from "lucide-react"
 import { useAuth } from "@/components/auth-provider"
 import { createClient } from "@/lib/supabase/client"
-import { useRouter } from "next/navigation"
+import "leaflet/dist/leaflet.css"
 
-const LeafletMap = dynamic(() => import("@/components/leaflet-map"), {
+const LocationMap = dynamic(() => import("@/components/location-map"), {
   ssr: false,
   loading: () => (
     <div className="w-full h-full bg-muted rounded-lg flex items-center justify-center">
@@ -59,36 +61,18 @@ interface Province {
   note_by_checker: string
 }
 
-interface CensusData {
-  id: string
-  pro_code: string
-  provinces_kh: string
-  provinces: string
-  households: number
-  males: number
-  females: number
-  total: number
-  household_size: number
-  area_km2: number
-  pop_km2: number
-  year: number
-}
-
 export default function DetailsPage() {
   const [provinces, setProvinces] = useState<Province[]>([])
   const [selectedProvince, setSelectedProvince] = useState<Province | null>(null)
   const [loading, setLoading] = useState(true)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
   const [editForm, setEditForm] = useState<Partial<Province>>({})
-  const [censusData, setCensusData] = useState<CensusData[]>([])
-  const [selectedCensusData, setSelectedCensusData] = useState<CensusData | null>(null)
   const { isAuthenticated } = useAuth()
   const supabase = createClient()
   const router = useRouter()
 
   useEffect(() => {
     loadProvinces()
-    loadCensusData()
   }, [])
 
   const loadProvinces = async () => {
@@ -105,18 +89,14 @@ export default function DetailsPage() {
       } else {
         const transformedProvinces: Province[] = await Promise.all(
           provincesData.map(async (p) => {
-            const [{ count: districtsCount }, { count: khanCount }, { data: districtIds }, { data: khanIds }] =
-              await Promise.all([
-                supabase.from("districts").select("*", { count: "exact", head: true }).eq("province_id", p.id),
-                supabase.from("khan").select("*", { count: "exact", head: true }).eq("province_id", p.id),
-                supabase.from("districts").select("id").eq("province_id", p.id),
-                supabase.from("khan").select("id").eq("province_id", p.id),
-              ])
+            const { count: districtsCount } = await supabase
+              .from("districts")
+              .select("*", { count: "exact", head: true })
+              .eq("province_id", p.id)
+
+            const { data: districtIds } = await supabase.from("districts").select("id").eq("province_id", p.id)
 
             let communesCount = 0
-            let sangkatCount = 0
-            let villagesCount = 0
-
             if (districtIds && districtIds.length > 0) {
               const { count } = await supabase
                 .from("communes")
@@ -126,55 +106,23 @@ export default function DetailsPage() {
                   districtIds.map((d) => d.id),
                 )
               communesCount = count || 0
-
-              const { data: communeIds } = await supabase
-                .from("communes")
-                .select("id")
-                .in(
-                  "district_id",
-                  districtIds.map((d) => d.id),
-                )
-
-              if (communeIds && communeIds.length > 0) {
-                const { count: villageCount } = await supabase
-                  .from("villages")
-                  .select("*", { count: "exact", head: true })
-                  .in(
-                    "commune_id",
-                    communeIds.map((c) => c.id),
-                  )
-                villagesCount += villageCount || 0
-              }
             }
 
-            if (khanIds && khanIds.length > 0) {
+            const { data: communeIds } = await supabase
+              .from("communes")
+              .select("id")
+              .in("district_id", districtIds?.map((d) => d.id) || [])
+
+            let villagesCount = 0
+            if (communeIds && communeIds.length > 0) {
               const { count } = await supabase
-                .from("sangkat")
+                .from("villages")
                 .select("*", { count: "exact", head: true })
                 .in(
-                  "khan_id",
-                  khanIds.map((k) => k.id),
+                  "commune_id",
+                  communeIds.map((c) => c.id),
                 )
-              sangkatCount = count || 0
-
-              const { data: sangkatIds } = await supabase
-                .from("sangkat")
-                .select("id")
-                .in(
-                  "khan_id",
-                  khanIds.map((k) => k.id),
-                )
-
-              if (sangkatIds && sangkatIds.length > 0) {
-                const { count: villageCount } = await supabase
-                  .from("villages")
-                  .select("*", { count: "exact", head: true })
-                  .in(
-                    "sangkat_id",
-                    sangkatIds.map((s) => s.id),
-                  )
-                villagesCount += villageCount || 0
-              }
+              villagesCount = count || 0
             }
 
             return {
@@ -184,12 +132,7 @@ export default function DetailsPage() {
               name_khmer: p.name_khmer,
               population: p.population || 0,
               area: p.area || 0,
-              subdivisions:
-                (districtsCount || 0) +
-                (khanCount || 0) +
-                (communesCount || 0) +
-                (sangkatCount || 0) +
-                (villagesCount || 0),
+              subdivisions: (districtsCount || 0) + (communesCount || 0) + (villagesCount || 0),
               latitude: p.latitude || 0,
               longitude: p.longitude || 0,
               elevation: p.elevation || 0,
@@ -211,23 +154,6 @@ export default function DetailsPage() {
       console.error("[v0] Error loading provinces:", error)
     } finally {
       setLoading(false)
-    }
-  }
-
-  const loadCensusData = async () => {
-    try {
-      console.log("[v0] Loading census data for details page...")
-
-      const { data: censusResult, error } = await supabase.from("census_data").select("*").order("provinces")
-
-      if (error) {
-        console.error("[v0] Error loading census data:", error)
-      } else {
-        setCensusData(censusResult || [])
-        console.log("[v0] Census data loaded for details page:", censusResult?.length || 0, "records")
-      }
-    } catch (error) {
-      console.error("[v0] Error loading census data:", error)
     }
   }
 
@@ -297,22 +223,6 @@ export default function DetailsPage() {
     }
   }
 
-  const handleProvinceChange = (value: string) => {
-    const province = provinces.find((p) => p.id === value)
-    setSelectedProvince(province || null)
-
-    if (province) {
-      const matchingCensus = censusData.find(
-        (c) =>
-          c.provinces.toLowerCase() === province.name_latin.toLowerCase() ||
-          c.pro_code === province.code ||
-          c.provinces_kh === province.name_khmer,
-      )
-      setSelectedCensusData(matchingCensus || null)
-      console.log("[v0] Matched census data for province:", province.name_latin, matchingCensus ? "Found" : "Not found")
-    }
-  }
-
   if (loading) {
     return (
       <div className="container mx-auto px-4 py-6">
@@ -339,11 +249,18 @@ export default function DetailsPage() {
         </Button>
       </div>
 
+      {/* Province Selector */}
       <div className="mb-6">
         <Label htmlFor="province-select" className="text-sm font-medium mb-2 block">
           Select Province
         </Label>
-        <Select value={selectedProvince?.id || ""} onValueChange={handleProvinceChange}>
+        <Select
+          value={selectedProvince?.id || ""}
+          onValueChange={(value) => {
+            const province = provinces.find((p) => p.id === value)
+            setSelectedProvince(province || null)
+          }}
+        >
           <SelectTrigger className="w-full max-w-md">
             <SelectValue placeholder="Choose a province..." />
           </SelectTrigger>
@@ -362,6 +279,7 @@ export default function DetailsPage() {
 
       {selectedProvince && (
         <>
+          {/* Breadcrumb */}
           <nav className="flex items-center space-x-2 text-sm text-muted-foreground mb-6">
             <span>Cambodia</span>
             <span>→</span>
@@ -369,6 +287,7 @@ export default function DetailsPage() {
             <span className="text-foreground font-medium">{selectedProvince.name_latin}</span>
           </nav>
 
+          {/* Header */}
           <div className="flex items-start justify-between mb-6">
             <div>
               <div className="flex items-center gap-3 mb-2">
@@ -399,6 +318,7 @@ export default function DetailsPage() {
             </div>
           </div>
 
+          {/* Stats Overview */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
             <Card className="p-6">
               <div className="flex items-center gap-3">
@@ -431,6 +351,7 @@ export default function DetailsPage() {
             </Card>
           </div>
 
+          {/* Main Content */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2">
               <Tabs defaultValue="overview" className="w-full">
@@ -551,107 +472,34 @@ export default function DetailsPage() {
                         </Button>
                       )}
                     </div>
-                    {selectedCensusData && (
-                      <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                        <div className="flex items-center gap-2 mb-2">
-                          <BarChart3 className="w-4 h-4 text-blue-600" />
-                          <span className="text-sm font-medium text-blue-800 dark:text-blue-200">
-                            Census Data Available ({selectedCensusData.year})
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-3">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Population</span>
+                          <span className="font-medium">{selectedProvince.population.toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Population Density</span>
+                          <span className="font-medium">
+                            {selectedProvince.area > 0
+                              ? Math.round(selectedProvince.population / selectedProvince.area)
+                              : 0}
+                            /km²
                           </span>
                         </div>
-                        <p className="text-xs text-blue-600 dark:text-blue-300">
-                          Official demographic data from Cambodia's {selectedCensusData.year} census
-                        </p>
-                      </div>
-                    )}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-4">
-                        <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
-                          Population Statistics
-                        </h4>
-                        <div className="space-y-3">
-                          <div className="flex justify-between items-center py-2 border-b border-muted">
-                            <span className="text-muted-foreground">Total Population</span>
-                            <span className="font-semibold text-lg">
-                              {selectedCensusData?.total?.toLocaleString() ||
-                                selectedProvince.population.toLocaleString()}
-                            </span>
-                          </div>
-                          {selectedCensusData && (
-                            <>
-                              <div className="flex justify-between items-center py-2 border-b border-muted">
-                                <span className="text-muted-foreground">Males</span>
-                                <span className="font-medium">
-                                  {selectedCensusData.males.toLocaleString()}
-                                  <span className="text-xs text-muted-foreground ml-1">
-                                    ({((selectedCensusData.males / selectedCensusData.total) * 100).toFixed(1)}%)
-                                  </span>
-                                </span>
-                              </div>
-                              <div className="flex justify-between items-center py-2 border-b border-muted">
-                                <span className="text-muted-foreground">Females</span>
-                                <span className="font-medium">
-                                  {selectedCensusData.females.toLocaleString()}
-                                  <span className="text-xs text-muted-foreground ml-1">
-                                    ({((selectedCensusData.females / selectedCensusData.total) * 100).toFixed(1)}%)
-                                  </span>
-                                </span>
-                              </div>
-                              <div className="flex justify-between items-center py-2 border-b border-muted">
-                                <span className="text-muted-foreground">Total Households</span>
-                                <span className="font-medium">{selectedCensusData.households.toLocaleString()}</span>
-                              </div>
-                              <div className="flex justify-between items-center py-2 border-b border-muted">
-                                <span className="text-muted-foreground">Average Household Size</span>
-                                <span className="font-medium">
-                                  {selectedCensusData.household_size.toFixed(1)} persons
-                                </span>
-                              </div>
-                            </>
-                          )}
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Households</span>
+                          <span className="font-medium">
+                            {Math.round(selectedProvince.population / 4).toLocaleString()}
+                          </span>
                         </div>
                       </div>
-                      <div className="space-y-4">
-                        <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
-                          Geographic Statistics
-                        </h4>
-                        <div className="space-y-3">
-                          <div className="flex justify-between items-center py-2 border-b border-muted">
-                            <span className="text-muted-foreground">Total Area</span>
-                            <span className="font-medium">
-                              {selectedCensusData?.area_km2?.toLocaleString() || selectedProvince.area.toLocaleString()}{" "}
-                              km²
-                            </span>
-                          </div>
-                          <div className="flex justify-between items-center py-2 border-b border-muted">
-                            <span className="text-muted-foreground">Population Density</span>
-                            <span className="font-medium">
-                              {selectedCensusData?.pop_km2?.toFixed(1) ||
-                                (selectedProvince.area > 0
-                                  ? Math.round(selectedProvince.population / selectedProvince.area)
-                                  : 0)}{" "}
-                              people/km²
-                            </span>
-                          </div>
-                          <div className="flex justify-between items-center py-2 border-b border-muted">
-                            <span className="text-muted-foreground">Administrative Sub-divisions</span>
-                            <span className="font-medium">{selectedProvince.subdivisions}</span>
-                          </div>
-                          {selectedCensusData && (
-                            <div className="flex justify-between items-center py-2 border-b border-muted">
-                              <span className="text-muted-foreground">Census Year</span>
-                              <span className="font-medium">{selectedCensusData.year}</span>
-                            </div>
-                          )}
+                      <div className="space-y-3">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Sub-divisions</span>
+                          <span className="font-medium">{selectedProvince.subdivisions}</span>
                         </div>
                       </div>
-                    </div>
-                    <div className="mt-6 pt-4 border-t border-muted">
-                      <p className="text-xs text-muted-foreground">
-                        {selectedCensusData
-                          ? `Data source: Cambodia Provisional Census ${selectedCensusData.year}, National Institute of Statistics`
-                          : "Population estimates based on administrative records"}
-                      </p>
                     </div>
                   </Card>
                 </TabsContent>
@@ -686,6 +534,7 @@ export default function DetailsPage() {
               </Tabs>
             </div>
 
+            {/* Sidebar */}
             <div className="space-y-6">
               <Card className="p-4">
                 <h3 className="font-semibold mb-4">Quick Actions</h3>
@@ -708,44 +557,15 @@ export default function DetailsPage() {
               <Card className="p-4">
                 <h3 className="font-semibold mb-4">Location Map</h3>
                 <div className="aspect-square bg-muted rounded-lg relative overflow-hidden">
-                  {selectedProvince && (
-                    <LeafletMap
-                      provinces={[selectedProvince]}
-                      districts={[]}
-                      communes={[]}
-                      villages={[]}
-                      khan={[]}
-                      sangkat={[]}
-                      boundaries={[]}
-                      layerStates={{
-                        provinces: true,
-                        districts: false,
-                        communes: false,
-                        villages: false,
-                        khan: false,
-                        sangkat: false,
-                        provinceBoundaries: false,
-                        districtBoundaries: false,
-                        communeBoundaries: false,
-                      }}
-                      selectedProvince={selectedProvince.id}
-                      onLocationSelect={(location) => {
-                        console.log("[v0] Location selected from details map:", location)
-                      }}
-                    />
-                  )}
+                  {selectedProvince && <LocationMap key={selectedProvince.id} province={selectedProvince} />}
                 </div>
-              </Card>
-
-              <Card className="p-4">
-                <h3 className="font-semibold mb-4">Recent Updates</h3>
-                <RecentUpdates />
               </Card>
             </div>
           </div>
         </>
       )}
 
+      {/* Edit Dialog */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>

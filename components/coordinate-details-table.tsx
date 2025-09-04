@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
-import { MapPin, Edit, Trash2, Search, Download, Trash, ArrowUpDown } from "lucide-react"
+import { MapPin, Edit, Trash2, Search, Download, Trash } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 
 interface CoordinateRecord {
@@ -23,9 +23,6 @@ interface CoordinateRecord {
   updated_at: string
 }
 
-type SortField = "code" | "name_latin" | "type" | "latitude" | "longitude"
-type SortDirection = "asc" | "desc"
-
 export function CoordinateDetailsTable() {
   const [coordinates, setCoordinates] = useState<CoordinateRecord[]>([])
   const [loading, setLoading] = useState(true)
@@ -35,8 +32,6 @@ export function CoordinateDetailsTable() {
   const [typeFilter, setTypeFilter] = useState("all")
   const [selectedRecords, setSelectedRecords] = useState<Set<string>>(new Set())
   const [selectAll, setSelectAll] = useState(false)
-  const [sortField, setSortField] = useState<SortField>("code")
-  const [sortDirection, setSortDirection] = useState<SortDirection>("asc")
   const [editForm, setEditForm] = useState({
     latitude: "",
     longitude: "",
@@ -51,19 +46,19 @@ export function CoordinateDetailsTable() {
         supabase
           .from("provinces")
           .select("id, code, name_latin, name_khmer, latitude, longitude, updated_at")
-          .order("code"),
+          .order("name_latin"),
         supabase
           .from("districts")
           .select("id, code, name_latin, name_khmer, latitude, longitude, updated_at")
-          .order("code"),
+          .order("name_latin"),
         supabase
           .from("communes")
           .select("id, code, name_latin, name_khmer, latitude, longitude, updated_at")
-          .order("code"),
+          .order("name_latin"),
         supabase
           .from("villages")
           .select("id, code, name_latin, name_khmer, latitude, longitude, updated_at")
-          .order("code"),
+          .order("name_latin"),
       ])
 
       const allCoordinates: CoordinateRecord[] = [
@@ -81,40 +76,9 @@ export function CoordinateDetailsTable() {
     }
   }
 
-  const sortCoordinates = (data: CoordinateRecord[]) => {
-    return [...data].sort((a, b) => {
-      let aValue: any = a[sortField]
-      let bValue: any = b[sortField]
-
-      if (sortField === "code") {
-        aValue = Number.parseInt(a.code) || 0
-        bValue = Number.parseInt(b.code) || 0
-      }
-
-      if (aValue === null || aValue === undefined) aValue = ""
-      if (bValue === null || bValue === undefined) bValue = ""
-
-      if (typeof aValue === "string" && typeof bValue === "string") {
-        aValue = aValue.toLowerCase()
-        bValue = bValue.toLowerCase()
-      }
-
-      if (sortDirection === "asc") {
-        return aValue < bValue ? -1 : aValue > bValue ? 1 : 0
-      } else {
-        return aValue > bValue ? -1 : aValue < bValue ? 1 : 0
-      }
-    })
-  }
-
-  const handleSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortDirection(sortDirection === "asc" ? "desc" : "asc")
-    } else {
-      setSortField(field)
-      setSortDirection("asc")
-    }
-  }
+  useEffect(() => {
+    loadCoordinates()
+  }, [])
 
   const handleEdit = (record: CoordinateRecord) => {
     setEditingRecord(record)
@@ -310,10 +274,8 @@ export function CoordinateDetailsTable() {
     return matchesSearch && matchesType
   })
 
-  const sortedCoordinates = sortCoordinates(filteredCoordinates)
-
-  const coordinatesWithData = sortedCoordinates.filter((record) => record.latitude && record.longitude)
-  const coordinatesWithoutData = sortedCoordinates.filter((record) => !record.latitude || !record.longitude)
+  const coordinatesWithData = filteredCoordinates.filter((record) => record.latitude && record.longitude)
+  const coordinatesWithoutData = filteredCoordinates.filter((record) => !record.latitude || !record.longitude)
 
   return (
     <Card>
@@ -386,43 +348,18 @@ export function CoordinateDetailsTable() {
                 <TableHead className="w-12">
                   <Checkbox checked={selectAll} onCheckedChange={handleSelectAll} aria-label="Select all" />
                 </TableHead>
-                <TableHead>
-                  <Button variant="ghost" onClick={() => handleSort("code")} className="h-auto p-0 font-semibold">
-                    Code
-                    <ArrowUpDown className="ml-2 h-4 w-4" />
-                  </Button>
-                </TableHead>
-                <TableHead>
-                  <Button variant="ghost" onClick={() => handleSort("name_latin")} className="h-auto p-0 font-semibold">
-                    Name (Latin)
-                    <ArrowUpDown className="ml-2 h-4 w-4" />
-                  </Button>
-                </TableHead>
+                <TableHead>Code</TableHead>
+                <TableHead>Name (Latin)</TableHead>
                 <TableHead>Name (Khmer)</TableHead>
-                <TableHead>
-                  <Button variant="ghost" onClick={() => handleSort("type")} className="h-auto p-0 font-semibold">
-                    Type
-                    <ArrowUpDown className="ml-2 h-4 w-4" />
-                  </Button>
-                </TableHead>
-                <TableHead>
-                  <Button variant="ghost" onClick={() => handleSort("latitude")} className="h-auto p-0 font-semibold">
-                    Latitude
-                    <ArrowUpDown className="ml-2 h-4 w-4" />
-                  </Button>
-                </TableHead>
-                <TableHead>
-                  <Button variant="ghost" onClick={() => handleSort("longitude")} className="h-auto p-0 font-semibold">
-                    Longitude
-                    <ArrowUpDown className="ml-2 h-4 w-4" />
-                  </Button>
-                </TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Latitude</TableHead>
+                <TableHead>Longitude</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sortedCoordinates.map((record) => {
+              {filteredCoordinates.map((record) => {
                 const recordKey = `${record.type}-${record.id}`
                 return (
                   <TableRow key={recordKey}>
@@ -471,7 +408,7 @@ export function CoordinateDetailsTable() {
           </Table>
         </div>
 
-        {sortedCoordinates.length === 0 && !loading && (
+        {filteredCoordinates.length === 0 && !loading && (
           <div className="text-center py-8 text-muted-foreground">No coordinates found matching your criteria.</div>
         )}
       </CardContent>

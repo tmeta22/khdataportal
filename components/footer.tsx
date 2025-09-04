@@ -14,11 +14,16 @@ export function Footer() {
         <div className="container mx-auto px-4 py-6">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="text-center md:text-left">
-              
-              
+              <p className="text-sm text-muted-foreground">
+                Data source: Gazetteer Database Online & National Committee for Sub-National Democratic Development
+                (NCDDS)
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                © 2025 Cambodia Administrative Data Portal | Built with AI-Meta@2025 | Inspired by Cambodia Local Guides
+              </p>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 order-first md:order-last">
               <Button
                 variant="ghost"
                 size="sm"

@@ -76,9 +76,6 @@ export function BoundaryImport({ onImportComplete }: BoundaryImportProps) {
 
   const matchAdministrativeUnit = async (properties: any, type: string) => {
     const possibleCodeFields = [
-      "ADM1_PCODE",
-      "ADM2_PCODE",
-      "ADM3_PCODE", // Standard PCODE fields
       "code",
       "CODE",
       "ADM_CODE",
@@ -91,14 +88,11 @@ export function BoundaryImport({ onImportComplete }: BoundaryImportProps) {
       "PROVINCE_CODE",
       "DISTRICT_CODE",
       "COMMUNE_CODE",
+      "ADM1_PCODE",
+      "ADM2_PCODE",
+      "ADM3_PCODE",
     ]
     const possibleNameFields = [
-      "ADM1_EN",
-      "ADM2_EN",
-      "ADM3_EN", // Standard English name fields
-      "ADM1_KH",
-      "ADM2_KH",
-      "ADM3_KH", // Standard Khmer name fields
       "name",
       "NAME",
       "ADM_NAME",
@@ -115,26 +109,47 @@ export function BoundaryImport({ onImportComplete }: BoundaryImportProps) {
       "PROVINCE_NAME",
       "DISTRICT_NAME",
       "COMMUNE_NAME",
+      "ADM1_EN",
+      "ADM2_EN",
+      "ADM3_EN",
     ]
 
     let code = null
     let name = null
 
-    // Try to find code first (more reliable)
-    for (const field of possibleCodeFields) {
-      if (properties[field] !== undefined && properties[field] !== null && properties[field] !== "") {
-        code = properties[field].toString().trim()
-        console.log("[v0] Found code field:", field, "=", code)
-        break
+    if (type === "district") {
+      const districtCodeFields = ["ADM2_PCODE", "dis_code", "DISTRICT_CODE", "code", "CODE"]
+      for (const field of districtCodeFields) {
+        if (properties[field] !== undefined && properties[field] !== null && properties[field] !== "") {
+          code = properties[field].toString().trim()
+          console.log("[v0] Found district code field:", field, "=", code)
+          break
+        }
       }
-    }
 
-    // Try to find name
-    for (const field of possibleNameFields) {
-      if (properties[field] !== undefined && properties[field] !== null && properties[field] !== "") {
-        name = properties[field].toString().trim()
-        console.log("[v0] Found name field:", field, "=", name)
-        break
+      const districtNameFields = ["ADM2_EN", "DISTRICT", "DISTRICT_NAME", "dis_name", "name", "NAME"]
+      for (const field of districtNameFields) {
+        if (properties[field] !== undefined && properties[field] !== null && properties[field] !== "") {
+          name = properties[field].toString().trim()
+          console.log("[v0] Found district name field:", field, "=", name)
+          break
+        }
+      }
+    } else {
+      for (const field of possibleCodeFields) {
+        if (properties[field] !== undefined && properties[field] !== null && properties[field] !== "") {
+          code = properties[field].toString().trim()
+          console.log("[v0] Found code field:", field, "=", code)
+          break
+        }
+      }
+
+      for (const field of possibleNameFields) {
+        if (properties[field] !== undefined && properties[field] !== null && properties[field] !== "") {
+          name = properties[field].toString().trim()
+          console.log("[v0] Found name field:", field, "=", name)
+          break
+        }
       }
     }
 
@@ -158,65 +173,49 @@ export function BoundaryImport({ onImportComplete }: BoundaryImportProps) {
         return null
     }
 
-    const query = supabase.from(tableName).select("id, code, name_latin, name_khmer")
+    let query = supabase.from(tableName).select("id, code, name_latin, name_khmer")
 
     if (code) {
-      // Try exact code match first
-      const { data: exactMatch } = await query.eq("code", code).limit(1).single()
-      if (exactMatch) {
-        console.log(`[v0] Exact code match found for ${type}:`, exactMatch.name_latin)
-        return exactMatch
+      if (type === "district") {
+        const { data: directMatch } = await supabase
+          .from(tableName)
+          .select("id, code, name_latin, name_khmer")
+          .eq("code", code)
+          .limit(1)
+          .single()
+
+        if (directMatch) {
+          console.log(`[v0] Successfully matched ${type} by direct code:`, directMatch.name_latin)
+          return directMatch
+        }
+
+        if (properties.ADM1_PCODE) {
+          const { data: provinceData } = await supabase
+            .from("provinces")
+            .select("id")
+            .eq("code", properties.ADM1_PCODE)
+            .single()
+
+          if (provinceData) {
+            query = query.eq("province_id", provinceData.id)
+          }
+        }
       }
 
-      // Try code as substring
-      const { data: codeSubstring } = await supabase
-        .from(tableName)
-        .select("id, code, name_latin, name_khmer")
-        .ilike("code", `%${code}%`)
-        .limit(1)
-        .single()
-      if (codeSubstring) {
-        console.log(`[v0] Code substring match found for ${type}:`, codeSubstring.name_latin)
-        return codeSubstring
-      }
+      query = query.eq("code", code)
+    } else if (name) {
+      query = query.or(`name_latin.ilike.%${name}%,name_khmer.ilike.%${name}%`)
     }
 
-    if (name) {
-      const nameMapping: { [key: string]: string } = {
-        Siemreap: "Siem Reap",
-        "Tboung Khmum": "Tbong Khmum",
-        "Phnom Penh": "Phnom Penh Capital",
-      }
+    const { data, error } = await query.limit(1).single()
 
-      const mappedName = nameMapping[name] || name
-
-      // Try exact name match (case insensitive)
-      const { data: exactNameMatch } = await supabase
-        .from(tableName)
-        .select("id, code, name_latin, name_khmer")
-        .or(`name_latin.ilike.${mappedName},name_khmer.ilike.${mappedName}`)
-        .limit(1)
-        .single()
-      if (exactNameMatch) {
-        console.log(`[v0] Exact name match found for ${type}:`, exactNameMatch.name_latin)
-        return exactNameMatch
-      }
-
-      // Try fuzzy name matching with mapped name
-      const { data: fuzzyMatches } = await supabase
-        .from(tableName)
-        .select("id, code, name_latin, name_khmer")
-        .or(`name_latin.ilike.%${mappedName}%,name_khmer.ilike.%${mappedName}%`)
-        .limit(5)
-
-      if (fuzzyMatches && fuzzyMatches.length > 0) {
-        console.log(`[v0] Fuzzy name match found for ${type}:`, fuzzyMatches[0].name_latin)
-        return fuzzyMatches[0]
-      }
+    if (error || !data) {
+      console.log(`[v0] No match found for ${type} with code: ${code}, name: ${name}`)
+      return null
     }
 
-    console.log(`[v0] No match found for ${type} with code: ${code}, name: ${name}`)
-    return null
+    console.log(`[v0] Successfully matched ${type}:`, data.name_latin)
+    return data
   }
 
   const handleImport = async () => {
@@ -284,8 +283,6 @@ export function BoundaryImport({ onImportComplete }: BoundaryImportProps) {
             [unitIdField]: matchedUnit.id,
             geojson: feature.geometry,
             properties: feature.properties,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
           })
 
           if (insertError) {
@@ -445,13 +442,10 @@ export function BoundaryImport({ onImportComplete }: BoundaryImportProps) {
             <li>• Each feature should have geometry and properties</li>
             <li>• Properties should include administrative code or name</li>
             <li>
-              • <strong>Supported code fields:</strong> ADM1_PCODE, ADM2_PCODE, ADM3_PCODE, code, CODE, ADM_CODE, PCODE,
-              id, ID, pro_code, dis_code, com_code, PROVINCE_CODE, DISTRICT_CODE, COMMUNE_CODE
+              • <strong>Supported code fields:</strong> code, CODE, ADM_CODE, PCODE, pro_code, dis_code, com_code
             </li>
             <li>
-              • <strong>Supported name fields:</strong> ADM1_EN, ADM2_EN, ADM3_EN, ADM1_KH, ADM2_KH, ADM3_KH, name,
-              NAME, ADM_NAME, NAME_EN, name_en, NAME_KH, name_kh, PROVINCE, DISTRICT, COMMUNE, pro_name, dis_name,
-              com_name, PROVINCE_NAME, DISTRICT_NAME, COMMUNE_NAME
+              • <strong>Supported name fields:</strong> name, NAME, ADM_NAME, NAME_EN, PROVINCE, DISTRICT, COMMUNE
             </li>
           </ul>
         </div>

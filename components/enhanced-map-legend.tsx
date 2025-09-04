@@ -14,8 +14,6 @@ interface MapLegendProps {
     districts: boolean
     communes: boolean
     villages: boolean
-    khan: boolean
-    sangkat: boolean
     provinceBoundaries: boolean
     districtBoundaries: boolean
     communeBoundaries: boolean
@@ -25,8 +23,6 @@ interface MapLegendProps {
     districts: number
     communes: number
     villages: number
-    khan?: number
-    sangkat?: number
   }
 }
 
@@ -49,25 +45,11 @@ export function EnhancedMapLegend({ onLayerToggle, layerStates, statistics }: Ma
       description: "Second-level administrative divisions",
     },
     {
-      key: "khan",
-      label: "Khan",
-      count: statistics.khan || 14,
-      color: "bg-amber-500",
-      description: "Urban districts (Phnom Penh Capital)",
-    },
-    {
       key: "communes",
       label: "Communes",
       count: statistics.communes || 1646,
       color: "bg-green-500",
       description: "Third-level administrative divisions",
-    },
-    {
-      key: "sangkat",
-      label: "Sangkat",
-      count: statistics.sangkat || 268,
-      color: "bg-emerald-500",
-      description: "Urban communes (Phnom Penh Capital)",
     },
     {
       key: "villages",
